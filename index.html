@@ -1,0 +1,2759 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101a2b">
+  <meta name="description" content="Калькулятор стоимости выезда на замер по Алматы и пригороду.">
+  <title>Адрес — цена | Замерщик FORONE.kz</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://nominatim.openstreetmap.org">
+  <link rel="preconnect" href="https://tile.openstreetmap.org">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    :root {
+      color-scheme: dark;
+      --page: #101a2b;
+      --panel: #172438;
+      --panel-raised: #1d2d43;
+      --field: #0f1929;
+      --line: #2c3d55;
+      --text: #f4f7fb;
+      --muted: #9aaac0;
+      --blue: #67c9f2;
+      --blue-dim: #183d54;
+      --green: #7ee0a0;
+      --amber: #ffd075;
+      --red: #ff8a8a;
+      --zone1: #39c96b;
+      --zone2: #4d9fff;
+      --zone3: #f59e0b;
+      --zone4: #ef5350;
+      --radius: 18px;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      padding: 0 16px calc(28px + env(safe-area-inset-bottom));
+      color: var(--text);
+      background:
+        radial-gradient(ellipse at 12% 0%, rgba(48, 119, 157, .16), transparent 35rem),
+        var(--page);
+    }
+    button, input, select, textarea { font: inherit; }
+    button { color: inherit; }
+    .app { width: min(1120px, 100%); margin: 0 auto; }
+    .topbar {
+      min-height: 88px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid rgba(154, 170, 192, .16);
+      margin-bottom: 22px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark {
+      width: 42px; height: 42px; border-radius: 13px; flex: 0 0 auto;
+      display: grid; place-items: center; color: var(--blue); background: var(--blue-dim);
+      border: 1px solid rgba(103, 201, 242, .24);
+    }
+    .brand-mark svg { width: 24px; height: 24px; }
+    .brand-name { font-weight: 800; font-size: 14px; letter-spacing: .11em; }
+    .brand-caption { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .top-tag {
+      padding: 8px 11px; border: 1px solid var(--line); border-radius: 999px;
+      color: #c9d5e5; font-size: 11px; letter-spacing: .08em; white-space: nowrap;
+    }
+    .page-heading { margin: 0 0 6px; font-size: clamp(23px, 4vw, 31px); letter-spacing: -.04em; line-height: 1.15; }
+    .page-subheading { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .intro { margin: 0 0 20px; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.02fr) minmax(360px, .98fr); gap: 18px; align-items: start; }
+    .stack { display: grid; gap: 16px; min-width: 0; }
+    .panel {
+      min-width: 0; padding: 19px; border-radius: var(--radius); background: var(--panel);
+      border: 1px solid rgba(154, 170, 192, .14); box-shadow: 0 12px 34px rgba(0, 0, 0, .13);
+    }
+    .panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    .panel-heading h2 { margin: 0; font-size: 15px; letter-spacing: .01em; }
+    .panel-heading p { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .step-label { color: var(--blue); font-size: 10px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; white-space: nowrap; }
+    .money-panel { padding: 16px 18px; background: linear-gradient(110deg, #1b3d3d, #1b3441 70%, #1d2e43); border-color: rgba(126, 224, 160, .22); }
+    .money-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .money-grid > * { min-width: 0; }
+    .money-label { color: #bfd0d6; font-size: 11px; line-height: 1.35; }
+    .money-value { min-width: 0; margin-top: 5px; color: var(--green); font-size: clamp(14px, 2vw, 22px); font-weight: 800; line-height: 1.15; letter-spacing: -.035em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .money-total .money-value { color: #e9f1fb; }
+    .money-note { color: #a9bbc6; font-size: 11px; margin-top: 7px; }
+    .field-label { display: block; margin: 0 0 7px; color: #d8e2ef; font-size: 12px; font-weight: 650; }
+    .address-wrap { position: relative; }
+    .address-input, .select-input, .number-input, .textarea-input {
+      width: 100%; min-height: 50px; border: 1px solid var(--line); border-radius: 12px;
+      padding: 12px 14px; color: var(--text); background: var(--field); outline: none;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    .address-input { padding-right: 57px; }
+    .address-input:focus, .select-input:focus, .number-input:focus, .textarea-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(103, 201, 242, .12); }
+    input::placeholder, textarea::placeholder { color: #74869d; }
+    .textarea-input { width: 100%; min-height: 82px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 12px; color: var(--text); background: var(--field); outline: none; resize: vertical; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 13px; }
+    .mic-button {
+      position: absolute; top: 6px; right: 6px; width: 38px; height: 38px; padding: 0;
+      border: 0; border-radius: 9px; display: grid; place-items: center; cursor: pointer;
+      color: #c2d7e5; background: #283c53; transition: background .15s ease, color .15s ease;
+    }
+    .mic-button svg { width: 19px; height: 19px; }
+    .mic-button:hover { color: #fff; background: #345571; }
+    .mic-button.recording { background: #743d48; color: #fff; animation: pulse 1s infinite; }
+    @keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(255, 138, 138, .14); } }
+    .examples { margin-top: 7px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .button-row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 9px; margin-top: 13px; }
+    .distance-field { min-width: 0; flex: 1 1 190px; display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 8px 12px; border: 1px solid rgba(103, 201, 242, .24); border-radius: 11px; background: rgba(38, 56, 79, .62); }
+    .distance-label { color: #c9d5e5; font-size: 10px; font-weight: 700; line-height: 1.3; }
+    .distance-value { color: var(--green); font-size: 16px; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .distance-detail { color: var(--muted); font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
+    .button {
+      min-height: 44px; border: 1px solid transparent; border-radius: 11px; padding: 10px 14px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      font-size: 13px; font-weight: 750; cursor: pointer; transition: transform .12s ease, background .12s ease, border-color .12s ease;
+    }
+    .button:active { transform: translateY(1px); }
+    .button:disabled { cursor: wait; opacity: .62; }
+    .button-primary { color: #071c27; background: var(--blue); }
+    .button-primary:hover { background: #8ddaf8; }
+    .button-secondary { color: #e5edf7; background: #26384f; border-color: #364962; }
+    .button-secondary:hover { background: #30455f; }
+    .button-quiet { min-height: 36px; padding: 7px 10px; color: #c5d2e1; background: transparent; border-color: var(--line); font-size: 11px; }
+    .button svg { width: 16px; height: 16px; }
+    .search-message { min-height: 18px; margin-top: 9px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .search-message.error { color: var(--red); }
+    .search-message.success { color: var(--green); }
+    .file-state { margin: 4px 0 12px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .file-state.dirty { color: var(--amber); border-color: rgba(255, 208, 117, .45); background: rgba(255, 208, 117, .07); }
+    .preset-wrap { margin-top: 14px; }
+    .select-input { min-height: 44px; padding: 9px 12px; font-size: 13px; }
+    .result-card {
+      margin-top: 16px; padding: 15px; border-radius: 14px; border: 1px solid rgba(103, 201, 242, .22);
+      background: linear-gradient(130deg, rgba(22, 51, 69, .86), rgba(15, 25, 41, .84));
+    }
+    .result-top { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .result-top > div:first-child { min-width: 0; flex: 1 1 auto; }
+    .result-kicker { margin-bottom: 5px; color: #9dc8db; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .result-zone { font-size: 17px; font-weight: 750; line-height: 1.25; }
+    .result-price { min-width: 0; max-width: 55%; flex: 0 1 auto; color: var(--green); font-size: clamp(17px, 4.2vw, 26px); font-weight: 850; line-height: 1.12; letter-spacing: -.04em; text-align: right; overflow-wrap: anywhere; }
+    .result-note { margin-top: 9px; color: #b8c7d7; font-size: 11px; line-height: 1.55; }
+    .status-chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 11px; padding: 6px 9px; border-radius: 999px; color: #bfe8d0; background: rgba(68, 139, 96, .16); font-size: 10px; }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+    .result-card.empty { border-style: dashed; border-color: var(--line); background: rgba(15, 25, 41, .48); }
+    .result-card.empty .result-zone { color: #dce5f0; }
+    .result-card.empty .result-price { color: #8395aa; }
+    .result-adjust { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; margin-top: 13px; }
+    .result-adjust[hidden], .range-field[hidden], .candidate-wrap[hidden], .training-controls[hidden] { display: none; }
+    .training-controls { display: grid; gap: 7px; margin-top: 10px; }
+    .training-button { width: 100%; }
+    .training-button:disabled { cursor: default; opacity: .82; }
+    .training-status { padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: rgba(15, 25, 41, .55); font-size: 11px; line-height: 1.45; }
+    .training-status.is-complete { color: var(--green); border-color: rgba(126, 224, 160, .35); background: rgba(68, 139, 96, .12); }
+    .range-field { margin-top: 10px; }
+    .range-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; align-items: end; }
+    .number-input { min-height: 42px; padding: 9px 12px; }
+    .save-button { width: 100%; margin-top: 13px; }
+    .map-card { overflow: hidden; }
+    .map-head { margin-bottom: 12px; }
+    .map { width: 100%; height: 310px; border: 1px solid rgba(154, 170, 192, .18); border-radius: 13px; overflow: hidden; background: #d5e1e4; }
+    .map-placeholder { height: 100%; display: grid; place-items: center; padding: 20px; color: #344459; background: linear-gradient(145deg, #d7e4e2, #b9cfce); text-align: center; }
+    .map-placeholder strong { display: block; font-size: 14px; }
+    .map-placeholder span { display: block; max-width: 240px; margin-top: 7px; font-size: 11px; line-height: 1.5; }
+    .candidate-wrap { margin: 0 0 10px; }
+    .candidate-select { font-size: 11px; }
+    .map-coordinates { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; color: var(--muted); font-size: 10px; }
+    .map-coordinates > span { min-width: 0; flex: 1 1 150px; overflow-wrap: anywhere; }
+    .map-coordinates .button { flex: 0 0 auto; }
+    .schematic { margin-top: 15px; padding: 13px; border: 1px solid rgba(154, 170, 192, .14); border-radius: 13px; background: #132034; }
+    .schematic-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .schematic-title strong { font-size: 12px; }
+    .schematic-title span { color: var(--muted); font-size: 10px; }
+    .schematic svg { display: block; width: 100%; height: auto; }
+    .schematic-caption { margin-top: 5px; color: #94a6bb; font-size: 10px; line-height: 1.45; }
+    .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; color: #aebed0; font-size: 10px; }
+    .legend-item { display: inline-flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 3px rgba(103,201,242,.16); }
+    .legend-square { width: 9px; height: 9px; border: 1px solid var(--zone1); background: rgba(57,201,107,.38); }
+    .legend-color { width: 9px; height: 9px; border-radius: 3px; }
+    .legend-color.zone2 { background: var(--zone2); }
+    .legend-color.zone3 { background: var(--zone3); }
+    .legend-color.zone4 { background: var(--zone4); }
+    .map-note { margin: 10px 1px 0; color: #93a5ba; font-size: 10px; line-height: 1.5; }
+    .history-head { align-items: center; }
+    .history-total { color: var(--green); font-weight: 800; font-size: 12px; white-space: nowrap; }
+    .history-list { display: grid; gap: 8px; max-height: 350px; overflow: auto; padding: 0; margin: 0; list-style: none; }
+    .history-empty { padding: 18px 10px; color: var(--muted); border: 1px dashed var(--line); border-radius: 12px; text-align: center; font-size: 12px; }
+    .history-item { display: grid; grid-template-columns: minmax(0, 1fr) minmax(58px, auto); gap: 12px; min-width: 0; padding: 11px 12px; border-radius: 12px; border: 1px solid rgba(154, 170, 192, .11); background: #142136; }
+    .history-address { overflow: hidden; color: #edf3fa; font-size: 12px; font-weight: 700; line-height: 1.4; text-overflow: ellipsis; }
+    .history-meta { margin-top: 5px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .history-status { display: inline-block; margin-top: 5px; font-size: 10px; }
+    .history-status.paid { color: var(--green); }
+    .history-status.pending { color: var(--amber); }
+    .history-status.false-call { color: #ffbf79; }
+    .history-status-select, .history-payer-select { display: block; max-width: 290px; min-height: 32px; margin-top: 7px; padding: 5px 8px; font-size: 10px; }
+    .review-notice { margin: 0 0 12px; padding: 10px 12px; border: 1px solid rgba(255, 208, 117, .48); border-radius: 10px; color: var(--amber); background: rgba(255, 208, 117, .08); font-size: 12px; line-height: 1.45; }
+    .history-status.review { color: var(--amber); }
+    .history-amount { min-width: 0; max-width: 100%; align-self: center; color: var(--green); font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; text-align: right; }
+    .history-amount.not-earned { color: #bdc9d6; }
+    .history-footer { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(154,170,192,.15); }
+    .history-controls { display: flex; flex-wrap: wrap; gap: 7px; }
+    .history-controls .button { min-height: 34px; }
+    .history-comment { margin-top: 5px; color: #d3dfec; font-size: 11px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .accounting-note { max-width: 290px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .privacy { margin: 14px 2px 0; color: #8092a9; font-size: 10px; line-height: 1.5; }
+    .map .leaflet-popup-content-wrapper, .map .leaflet-popup-tip { color: #172438; }
+    .map .leaflet-control-attribution { font-size: 9px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    @media (max-width: 820px) {
+      body { padding-left: 13px; padding-right: 13px; }
+      .layout { grid-template-columns: 1fr; }
+      .money-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .map-column { grid-row: 2; }
+      .stack { gap: 13px; }
+      .panel { padding: 16px; }
+      .map { height: min(62vw, 340px); min-height: 230px; }
+    }
+    @media (max-width: 420px) {
+      .topbar { min-height: 72px; margin-bottom: 17px; }
+      .top-tag { padding: 7px 9px; font-size: 9px; }
+      .brand-mark { width: 38px; height: 38px; }
+      .brand-name { font-size: 12px; }
+      .brand-caption { font-size: 10px; }
+      .result-adjust { grid-template-columns: 1fr; }
+      .money-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .form-grid { grid-template-columns: 1fr; }
+      .result-top { align-items: flex-start; }
+      .history-footer { align-items: flex-start; flex-direction: column; }
+      .money-panel { padding: 14px; }
+    }
+    @media print {
+      :root { color-scheme: light; --page: #fff; --panel: #fff; --text: #111; --muted: #555; --line: #bbb; }
+      body { min-width: 0; padding: 0; color: #111; background: #fff; }
+      .app { width: 100%; }
+      .layout { display: block; }
+      .topbar { min-height: 54px; margin: 0 0 12px; border-color: #bbb; }
+      .brand-caption, .top-tag, .intro, .address-panel, .map-column, .privacy, .history-controls, .history-status-select, .history-payer-select, .button { display: none !important; }
+      .money-panel, .panel { color: #111; background: #fff; border: 1px solid #bbb; box-shadow: none; }
+      .money-label, .money-note, .history-meta, .accounting-note { color: #333; }
+      .money-value, .money-total .money-value, .history-amount { color: #111; }
+      .money-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .history-list { max-height: none; overflow: visible; }
+      .history-item { color: #111; background: #fff; border-color: #bbb; break-inside: avoid; }
+      .history-address, .history-comment { color: #111; }
+      .history-status, .history-status.paid, .history-status.pending, .history-status.false-call { color: #222; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+    .debug-panel {
+      max-width: 960px;
+      margin: 12px auto 0;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      color: var(--muted);
+      background: var(--panel);
+      font-size: .78rem;
+    }
+    .debug-panel summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .debug-panel #debug {
+      max-height: 180px;
+      overflow: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 19.5 10.2 5l3.4 8 2-4.5 4.4 11M7.2 12h5.1m-6.9 4.2h13.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="17.7" cy="16.4" r="2.4" fill="#172438" stroke="currentColor" stroke-width="1.6"/></svg>
+        </div>
+        <div>
+          <div class="brand-name">FORONE.KZ · ЗАМЕРЩИК</div>
+          <div class="brand-caption">Адрес — тариф — заработок</div>
+        </div>
+      </div>
+      <div class="top-tag">АЛМАТЫ И ПРИГОРОД</div>
+    </header>
+
+    <div class="intro">
+      <h1 class="page-heading">Ввёл адрес — увидел, сколько заработал.</h1>
+      <p class="page-subheading">Найди адрес выезда, проверь тарифную зону на карте и сохрани результат в историю.</p>
+    </div>
+
+    <main class="layout">
+      <div class="stack">
+        <section class="panel money-panel" aria-label="Сводка дохода">
+          <div class="money-grid">
+            <div><div class="money-label">Получено от компании сегодня</div><div class="money-value" id="todayEarned">0 ₸</div><div class="money-note" id="todayCount">0 оплаченных выездов</div></div>
+            <div class="money-total"><div class="money-label">Всего получено от компании</div><div class="money-value" id="totalEarned">0 ₸</div></div>
+            <div><div class="money-label">Ожидают оплаты от компании</div><div class="money-value" id="pendingTotal">0 ₸</div></div>
+            <div><div class="money-label">Ожидают оплаты от клиента</div><div class="money-value" id="pendingClientTotal">0 ₸</div></div>
+            <div><div class="money-label">Выездов</div><div class="money-value" id="totalVisits">0</div></div>
+            <div><div class="money-label">Ложных вызовов</div><div class="money-value" id="falseCallCount">0</div></div>
+          </div>
+        </section>
+
+        <section class="panel address-panel" aria-labelledby="addressHeading">
+          <div class="panel-heading">
+            <div>
+              <h2 id="addressHeading">Куда едем?</h2>
+              <p>Введи адрес или пересечение улиц — точка появится на карте.</p>
+            </div>
+            <span class="step-label">01 · АДРЕС</span>
+          </div>
+
+          <label class="field-label" for="streetInput">Адрес, улицы или микрорайон</label>
+          <div class="address-wrap">
+            <input class="address-input" id="streetInput" type="text" autocomplete="street-address" placeholder="Например: Абая, 10 или Абая — Саина">
+            <button class="mic-button" id="micBtn" type="button" aria-label="Продиктовать адрес" title="Голосовой ввод">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3m-3 0h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <div class="examples">Можно ввести улицу, микрорайон или Орбиту: «Третий микрорайон, 35», «Орбита 1, 54», «Абая и Саина». Номер микрорайона и дома можно произнести словами.</div>
+          <div class="button-row">
+            <button class="button button-primary" id="searchBtn" type="button">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3" stroke="currentColor" stroke-width="1.8"/><path d="m15.5 15.5 4.1 4.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              Найти адрес
+            </button>
+            <div class="distance-field" role="status" aria-live="polite" aria-label="Расстояние по прямой от телефона до адреса">
+              <span class="distance-label">До точки выезда по прямой</span>
+              <strong class="distance-value" id="straightLineDistance">GPS не определён</strong>
+              <span class="distance-detail" id="distanceDetail">Чтобы рассчитать расстояние, обнови GPS кнопкой под картой.</span>
+            </div>
+          </div>
+          <div id="searchMessage" class="search-message" role="status" aria-live="polite">Нажми «Найти адрес» — сервис поставит точку на карте.</div>
+
+          <div class="preset-wrap">
+            <label class="field-label" for="presetSelect">Быстрый выбор зоны</label>
+            <select class="select-input" id="presetSelect">
+              <option value="">Выбери тарифную зону…</option>
+              <option value="zone1">Зона 1 · 5 000 ₸</option>
+              <option value="zone2Range">Зона 2 · 7 000–8 000 ₸ (вилка)</option>
+              <option value="zone3Range">Зона 3 · 10 000–12 000 ₸ (вилка)</option>
+              <option value="zone4">Зона 4 · 15 000 ₸</option>
+            </select>
+          </div>
+
+          <div class="result-card empty" id="resultCard" aria-live="polite">
+            <div class="result-top">
+              <div>
+                <div class="result-kicker">Предварительный расчёт</div>
+                <div class="result-zone" id="resZone">Сначала укажи адрес</div>
+              </div>
+              <div class="result-price" id="resPrice">—</div>
+            </div>
+            <div class="result-note" id="resDesc">Адрес будет проверен по прайсу и показан на карте.</div>
+            <div class="status-chip" id="resultStatus" hidden><span class="status-dot"></span><span id="resultStatusText"></span></div>
+          </div>
+
+          <div class="result-adjust" id="resultAdjust" hidden>
+            <div>
+              <label class="field-label" for="zoneSelect">Группа / тариф</label>
+              <select class="select-input" id="zoneSelect">
+                <option value="">Выбери группу по прайсу…</option>
+                <option value="zone1">Зона 1 · 5 000 ₸</option>
+                <option value="zone2Range">Зона 2 · 7 000–8 000 ₸ (вилка)</option>
+                <option value="zone3Range">Зона 3 · 10 000–12 000 ₸ (вилка)</option>
+                <option value="zone4">Зона 4 · 15 000 ₸</option>
+              </select>
+            </div>
+            <button class="button button-quiet" id="resetBtn" type="button">Сбросить</button>
+          </div>
+          <div class="training-controls" id="trainingControls" hidden>
+            <button class="button button-secondary training-button" id="rememberRateBtn" type="button" disabled>Запомнить тариф</button>
+            <div class="training-status" id="trainingStatus" role="status" aria-live="polite" hidden></div>
+          </div>
+          <div class="range-field" id="rangeField" hidden>
+            <label class="field-label" for="rateSelect">Конкретная цена из вилки</label>
+            <div class="range-row">
+              <input class="number-input" id="rateSelect" type="number" min="7000" max="12000" step="1" inputmode="numeric" placeholder="Например, 7 300">
+            </div>
+            <div class="examples" id="rangeHint">Введи точную согласованную сумму в пределах диапазона. Ставка автоматически не угадывается.</div>
+          </div>
+          <div class="range-field" id="zone4Field" hidden>
+            <label class="field-label" for="zone4Method">Способ тарификации Зоны 4</label>
+            <select class="select-input" id="zone4Method">
+              <option value="fixed">Стандартный тариф — 15 000 ₸</option>
+              <option value="distance">Альтернативный — 5 000 ₸ + 250 ₸/км от черты города</option>
+            </select>
+            <div class="range-field" id="zone4DistanceWrap" hidden>
+              <label class="field-label" for="zone4Distance">Подтверждённое расстояние от черты города, км</label>
+              <input class="number-input" id="zone4Distance" type="number" min="0" step="any" inputmode="decimal" placeholder="Например, 10 или 10,5">
+              <div class="examples">Расстояние не рассчитывается автоматически. Введи подтверждённые километры; если формула даёт дробную сумму в ₸, потребуется уточнить правило округления.</div>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div>
+              <label class="field-label" for="measureType">Тип замера</label>
+              <select class="select-input" id="measureType">
+                <option value="measurement">Замер</option>
+                <option value="additionalVisit">Доп. выезд</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label" for="visitOutcome">Результат выезда</label>
+              <select class="select-input" id="visitOutcome">
+                <option value="completed">Замер состоялся</option>
+                <option value="falseCall">Ложный вызов</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label" for="payerSelect">Кто оплачивает</label>
+              <select class="select-input" id="payerSelect">
+                <option value="company">Компания FORONE.kz</option>
+                <option value="client">Клиент</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label" for="paymentStatus">Получение оплаты</label>
+              <select class="select-input" id="paymentStatus">
+                <option value="pending">Ожидает оплаты</option>
+                <option value="paid">Оплачено</option>
+              </select>
+            </div>
+          </div>
+          <div class="preset-wrap">
+            <label class="field-label" for="commentInput">Комментарий</label>
+            <textarea class="textarea-input" id="commentInput" maxlength="2000" placeholder="Дополнительная информация по выезду"></textarea>
+          </div>
+          <div class="examples">Начисления учитывают выезды, оплаченные компанией FORONE.kz.</div>
+          <button class="button button-primary save-button" id="saveBtn" type="button" disabled>Сохранить выезд в историю</button>
+        </section>
+
+        <section class="panel" aria-labelledby="historyHeading">
+          <div class="panel-heading history-head">
+            <div>
+              <h2 id="historyHeading">История выездов</h2>
+              <p>Записи хранятся внутри этого файла и на устройстве.</p>
+            </div>
+            <span class="history-total" id="historyCount">0 выездов</span>
+          </div>
+          <div class="review-notice" id="reviewNotice" role="status" hidden></div>
+          <ul class="history-list" id="historyList" aria-live="polite"></ul>
+          <div class="file-state" id="fileState" role="status"></div>
+          <div class="history-footer">
+            <div class="accounting-note">Начисления компании учитываются отдельно от клиентских оплат. После изменений нажми «СБОРКА», чтобы скачать HTML-копию с актуальными данными.</div>
+            <div class="history-controls">
+              <button class="button button-primary" id="saveFileBtn" type="button">СБОРКА</button>
+              <button class="button button-quiet" id="exportBtn" type="button">Экспорт JSON</button>
+              <button class="button button-quiet" id="importBtn" type="button">Импорт JSON</button>
+              <input id="importFile" type="file" accept="application/json,.json" hidden>
+              <button class="button button-quiet" id="printBtn" type="button">Печать</button>
+              <button class="button button-quiet" id="clearHistoryBtn" type="button">Очистить историю</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <aside class="stack map-column">
+        <section class="panel map-card" aria-labelledby="mapHeading">
+          <div class="panel-heading map-head">
+            <div>
+              <h2 id="mapHeading">Точка на карте</h2>
+              <p id="mapAddress">После поиска здесь появится адрес выезда.</p>
+            </div>
+            <span class="step-label">02 · КАРТА</span>
+          </div>
+          <div class="candidate-wrap" id="candidateWrap" hidden>
+            <label class="field-label" for="candidateSelect">Выбери подходящий найденный адрес</label>
+            <select class="select-input candidate-select" id="candidateSelect"></select>
+          </div>
+          <div class="map" id="map" role="application" aria-label="Интерактивная карта адреса в Алматы">
+            <div class="map-placeholder" id="mapPlaceholder"><div><strong>Карта Алматы</strong><span>После поиска появится отметка адреса. Нужен интернет для карты и поиска.</span></div></div>
+          </div>
+          <div class="map-coordinates"><span id="coordinates">Координаты адреса: —</span><button class="button button-quiet" id="gpsMapBtn" type="button" title="Определить текущее местоположение и пересчитать расстояние">Обновить GPS и расстояние</button></div>
+
+          <div class="schematic">
+            <div class="schematic-title"><strong>Схема тарифных зон</strong><span>ориентир, не кадастровая граница</span></div>
+            <svg id="zoneDiagram" viewBox="0 0 560 260" role="img" aria-label="Схематичная карта тарифных зон Алматы">
+              <defs>
+                <linearGradient id="cityFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#203957"/><stop offset="1" stop-color="#172940"/></linearGradient>
+                <filter id="pinGlow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              </defs>
+              <path d="M106 82 Q170 34 262 47 Q355 29 433 83 Q483 121 450 180 Q414 229 321 224 Q223 246 144 207 Q78 170 106 82Z" fill="#4d9fff" fill-opacity=".17" stroke="#4d9fff" stroke-width="1.5" stroke-dasharray="5 5"/>
+              <text x="273" y="37" fill="#a9bdd3" font-size="12" font-weight="700" text-anchor="middle">АЛМАТЫ · ЗОНА 2</text>
+              <path d="M210 96 L351 95 L351 164 L210 164 Z" fill="#39c96b" fill-opacity=".28" stroke="#39c96b" stroke-width="2"/>
+              <text x="280" y="127" fill="#c6eafa" font-size="12" font-weight="700" text-anchor="middle">ЗОНА 1</text>
+              <text x="280" y="145" fill="#95b5cb" font-size="9" text-anchor="middle">внутри базового квадрата</text>
+              <text x="101" y="125" fill="#f59e0b" font-size="10" font-weight="700" text-anchor="middle">ЗОНА 3</text>
+              <text x="463" y="129" fill="#f59e0b" font-size="10" font-weight="700" text-anchor="middle">ЗОНА 3</text>
+              <text x="84" y="211" fill="#ef5350" font-size="10" font-weight="700" text-anchor="middle">ЗОНА 4</text>
+              <text x="482" y="211" fill="#ef5350" font-size="10" font-weight="700" text-anchor="middle">ЗОНА 4</text>
+              <g id="diagramPin" display="none" filter="url(#pinGlow)">
+                <circle id="diagramHalo" cx="280" cy="130" r="12" fill="rgba(103,201,242,.22)"/>
+                <circle id="diagramDot" cx="280" cy="130" r="5.5" fill="#67c9f2" stroke="#fff" stroke-width="2"/>
+                <text id="diagramLabel" x="294" y="119" fill="#fff" font-size="10" font-weight="800">АДРЕС</text>
+              </g>
+            </svg>
+            <div class="legend" aria-label="Цвета зон"><span class="legend-item"><i class="legend-square"></i> Зона 1 — зелёная</span><span class="legend-item"><i class="legend-color zone2"></i> Зона 2 — синяя</span><span class="legend-item"><i class="legend-color zone3"></i> Зона 3 — оранжевая</span><span class="legend-item"><i class="legend-color zone4"></i> Зона 4 — красная</span><span class="legend-item"><i class="legend-dot"></i> найденный адрес</span></div>
+            <div class="schematic-caption" id="diagramCaption">Схема помогает увидеть, где находится точка относительно города и базового квадрата. Фактический тариф зависит от улиц и района из прайса.</div>
+          </div>
+          <div class="map-note">Настоящая карта — OpenStreetMap. Синим контуром отмечена ориентировочная граница базового квадрата; при спорном адресе сверь тариф с прайсом.</div>
+        </section>
+      </aside>
+    </main>
+    <p class="privacy">При поиске адрес передаётся сервису OpenStreetMap (Nominatim). История, сводные показатели, плательщик, статус получения оплаты, тип замера и комментарии хранятся в localStorage этого устройства и могут быть встроены в HTML-копию кнопкой «СБОРКА».</p>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script type="application/json" id="embeddedData">{"v":1,"history":[],"memory":{}}</script>
+  <details class="debug-panel" id="debugPanel">
+    <summary>Диагностика приложения</summary>
+    <div id="debug" role="status" aria-live="polite"></div>
+  </details>
+  <script>
+    'use strict';
+    // Снимок исходной страницы до любых изменений DOM — из него собирается обновлённый файл.
+    const PRISTINE_HTML = '<!doctype html>\n' + document.documentElement.outerHTML;
+
+    const STORAGE_KEY = 'forone_income_history_v3';
+    const PREVIOUS_STORAGE_KEY = 'forone_income_history_v2';
+    const LEGACY_KEY = 'forone_history';
+    const SUMMARY_KEY = 'forone_summary_snapshot_v1';
+    const ALMATY_CENTER = [43.2383, 76.9455];
+    const SERVICE_AREA = { minLat: 43.08, maxLat: 43.42, minLon: 76.55, maxLon: 77.35, maxDistanceKm: 42 };
+    const SPOKEN_NUMBER_WORDS = {
+      ноль: '0', один: '1', одна: '1', одно: '1', первый: '1', первая: '1', первое: '1',
+      два: '2', две: '2', второй: '2', вторая: '2', второе: '2',
+      три: '3', третий: '3', третья: '3', третье: '3', третьи: '3', третьего: '3', третьем: '3',
+      четыре: '4', четвертый: '4', четвёртый: '4', четвертая: '4', четвёртая: '4', четвертое: '4', четвёртое: '4', четвертого: '4', четвёртого: '4', четвертом: '4', четвёртом: '4',
+      пять: '5', пятый: '5', пятая: '5', пятом: '5', пятого: '5', пятые: '5',
+      шесть: '6', шестой: '6', шестая: '6', шестом: '6', шестого: '6', шестые: '6',
+      семь: '7', седьмой: '7', седьмая: '7', седьмом: '7',
+      восемь: '8', восьмой: '8', восьмая: '8', восьмом: '8',
+      девять: '9', девятый: '9', девятая: '9', девятом: '9',
+      десять: '10', десятый: '10', десятая: '10', десятом: '10',
+      одиннадцать: '11', одиннадцатый: '11', одиннадцатая: '11', одиннадцатом: '11',
+      двенадцать: '12', двенадцатый: '12', двенадцатая: '12', двенадцатом: '12'
+    };
+    const SPOKEN_TENS = {
+      двадцать: 20, тридцать: 30, сорок: 40, пятьдесят: 50,
+      шестьдесят: 60, семьдесят: 70, восемьдесят: 80, девяносто: 90
+    };
+    // Ориентировочный контур квадрата по улицам из прайса, для визуальной проверки на карте.
+    const ZONE1_POLYGON = [[43.201, 76.833], [43.199, 76.985], [43.270, 76.990], [43.270, 76.835]];
+
+    const ZONES = {
+      zone1: { zone: 'Зона 1 · базовый квадрат', price: 5000, desc: 'Внутри Аль-Фараби — Саина — Рыскулова — ВОАД / Достык.' },
+      zone2Range: { zone: 'Зона 2 · город Алматы', price: null, min: 7000, max: 8000, rangeLabel: '7 000–8 000 ₸', desc: 'Укажи согласованную ставку в диапазоне 7 000–8 000 ₸.' },
+      zone3Range: { zone: 'Зона 3 · ближний пригород', price: null, min: 10000, max: 12000, rangeLabel: '10 000–12 000 ₸', desc: 'Укажи согласованную ставку в диапазоне 10 000–12 000 ₸.' },
+      zone4: { zone: 'Зона 4 · дальний пригород', price: 15000, desc: 'Стандартный тариф Зоны 4 — 15 000 ₸. По прайсу доступен альтернативный расчёт: 5 000 ₸ + 250 ₸ за каждый километр от черты города.' }
+    };
+
+    // OSM relation 2465058 (admin_level=4, version 189, 2026-11-11) помечена fixme «Уточнить границы города»;
+    // её геометрия не используется как точная тарифная граница. Зону 2 определяем только по адресу Nominatim;
+    // для несогласованных/неизвестных пригородов просим ручной выбор и не считаем расстояние от центра.
+    // Населённые пункты используются только для определения номера зоны, не отдельной цены.
+    const PLACE_RULES = [
+      { keys: ['каменское плато', 'жетысу', 'аксай', 'таусамалы', 'каменка', 'акжар', 'ремизовка', 'баганашил', 'ерменсай', 'нурлытау', 'горный гигант', 'калкаман', 'шугыла', 'шугла', 'саялы', 'зердели', 'аэропорт', 'жулдыз', 'думан', 'кульджин'], zone: 'zone2Range' },
+      { keys: ['гульдала', 'кызылту', 'отеген', 'грэс', 'кыргауылды', 'абай', 'райымбек', 'бесагаш', 'туздыбастау', 'боралдай', 'бурундай', 'водник', 'иргели'], zone: 'zone3Range' },
+      { keys: ['каскелен', 'шамалган', 'талгар', 'есик', 'иссик', 'первомайские пруды', 'байсерке'], zone: 'zone4' }
+    ];
+
+    const $ = (id) => document.getElementById(id);
+    const debugOutput = $('debug');
+    const debugPanel = $('debugPanel');
+    ['log', 'warn', 'error'].forEach(method => {
+      const originalMethod = console[method].bind(console);
+      console[method] = (...args) => {
+        originalMethod(...args);
+        if (!debugOutput) return;
+        const message = args.map(value => {
+          if (typeof value === 'string') return value;
+          if (value instanceof Error) return `${value.name}: ${value.message}`;
+          try { return JSON.stringify(value); }
+          catch (error) { return String(value); }
+        }).join(' ');
+        const line = `[${method.toUpperCase()}] ${message}`;
+        debugOutput.textContent = `${debugOutput.textContent}${debugOutput.textContent ? '\n' : ''}${line}`.slice(-12000);
+        if (debugPanel) debugPanel.open = true;
+      };
+    });
+    let currentAddress = '';
+    let currentZoneKey = null;
+    let currentPrice = 0;
+    let currentZoneName = '';
+    let currentNote = '';
+    let currentRateMethod = 'fixed';
+    let currentDistanceKm = null;
+    let currentPoint = null;
+    let geocodeCandidates = [];
+    let leafletMap = null;
+    let addressMarker = null;
+    let gpsMarker = null;
+    let gpsPoint = null;
+    let gpsAccuracy = null;
+    let zonePolygon = null;
+    let lastGeocodeAt = 0;
+    let recognition = null;
+    let isRecording = false;
+
+    // ===== Данные внутри файла =====
+    const MEMORY_KEY = 'forone_memory_v1';
+    const FILE_NAME = 'forone-zamershik.html';
+    const store = (() => {
+      const mem = new Map();
+      return {
+        get(k) { try { const v = localStorage.getItem(k); if (v != null) return v; } catch (e) {} return mem.has(k) ? mem.get(k) : null; },
+        set(k, v) { mem.set(k, v); try { localStorage.setItem(k, v); } catch (e) {} },
+        remove(k) { mem.delete(k); try { localStorage.removeItem(k); } catch (e) {} }
+      };
+    })();
+    let EMBEDDED = { history: [], memory: {}, summary: null };
+    try {
+      const p = JSON.parse($('embeddedData').textContent);
+      if (p && typeof p === 'object') EMBEDDED = { history: Array.isArray(p.history) ? p.history : [], memory: p.memory && typeof p.memory === 'object' ? p.memory : {}, summary: p.summary && typeof p.summary === 'object' ? p.summary : null };
+    } catch (e) {}
+    let savedSig = null;
+
+    function readMemory() {
+      try { const m = JSON.parse(store.get(MEMORY_KEY) || '{}'); return m && typeof m === 'object' ? m : {}; } catch (e) { return {}; }
+    }
+    function bootData() {
+      const embeddedHistory = EMBEDDED.history.map(normalizeHistoryItem);
+      const embeddedSummary = normalizeSummarySnapshot(EMBEDDED.summary);
+      savedSig = JSON.stringify([embeddedHistory, EMBEDDED.memory, embeddedSummary]);
+      if (store.get(SUMMARY_KEY) == null && EMBEDDED.summary) store.set(SUMMARY_KEY, JSON.stringify(embeddedSummary));
+      const local = readHistory();
+      const ids = new Set(local.map(i => String(i.id)));
+      const extra = embeddedHistory.filter(i => !ids.has(String(i.id)));
+      if (extra.length) {
+        const merged = [...local, ...extra].sort((a, b) => (entryDate(b) || 0) - (entryDate(a) || 0));
+        store.set(STORAGE_KEY, JSON.stringify(merged));
+      }
+      store.set(MEMORY_KEY, JSON.stringify({ ...EMBEDDED.memory, ...readMemory() }));
+    }
+    function currentSig() { return JSON.stringify([readHistory(), readMemory(), readSummarySnapshot()]); }
+    function updateFileState() {
+      const node = $('fileState');
+      if (!node || savedSig == null) return;
+      const dirty = currentSig() !== savedSig;
+      node.className = 'file-state' + (dirty ? ' dirty' : '');
+      node.textContent = dirty
+        ? 'Есть изменения, которых ещё нет во встроенной копии. Нажми «СБОРКА», чтобы скачать новую HTML-копию.'
+        : 'История и сводные показатели совпадают с данными встроенной в текущую копию.';
+    }
+    function buildFileHtml() {
+      const data = { v: 3, savedAt: new Date().toISOString(), history: readHistory(), memory: readMemory(), summary: readSummarySnapshot() };
+      const json = JSON.stringify(data).replace(/</g, '\\u003c');
+      return PRISTINE_HTML.replace(/(<script type="application\/json" id="embeddedData">)[\s\S]*?(<\/script>)/, (m, a, b) => a + json + b);
+    }
+    async function saveFile() {
+      if (saveFile.isBuilding) return;
+      saveFile.isBuilding = true;
+      const button = $('saveFileBtn');
+      button.disabled = true;
+      const sig = currentSig();
+      let url = null;
+      try {
+        const blob = new Blob([buildFileHtml()], { type: 'text/html;charset=utf-8' });
+        url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = FILE_NAME;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        savedSig = sig;
+        updateFileState();
+        setMessage('СБОРКА сформирована. Проверь загрузки браузера и открой скачанную HTML-копию; исходный файл автоматически не заменён.', 'success');
+      } catch (error) {
+        console.error('Не удалось собрать HTML-копию:', error);
+        setMessage('Не удалось собрать HTML-копию. Исходные данные не изменены; попробуй ещё раз.', 'error');
+      } finally {
+        if (url) setTimeout(() => URL.revokeObjectURL(url), 10000);
+        button.disabled = false;
+        saveFile.isBuilding = false;
+      }
+    }
+
+    function rememberChoice() {
+      const key = normalize(currentAddress);
+      if (!key || !currentZoneKey || !Number.isFinite(currentPrice) || currentPrice <= 0) return false;
+      const memory = readMemory();
+      memory[key] = { zoneKey: currentZoneKey, price: currentPrice, rateMethod: currentRateMethod, distanceKm: currentDistanceKm, at: new Date().toISOString() };
+      store.set(MEMORY_KEY, JSON.stringify(memory));
+      return true;
+    }
+
+    function currentChoiceMatchesMemory() {
+      const key = normalize(currentAddress);
+      if (!key || !currentZoneKey || !Number.isFinite(currentPrice) || currentPrice <= 0) return false;
+      const saved = readMemory()[key];
+      if (!saved || saved.zoneKey !== currentZoneKey || Number(saved.price) !== currentPrice) return false;
+      if ((saved.rateMethod || 'fixed') !== currentRateMethod) return false;
+      return currentRateMethod !== 'distance' || Number(saved.distanceKm) === currentDistanceKm;
+    }
+
+    function updateTrainingUI() {
+      const controls = $('trainingControls');
+      const button = $('rememberRateBtn');
+      const status = $('trainingStatus');
+      if (!controls || !button || !status) return;
+      controls.hidden = $('resultAdjust').hidden;
+      if (controls.hidden) {
+        button.disabled = true;
+        button.textContent = 'Запомнить тариф';
+        status.hidden = true;
+        status.className = 'training-status';
+        status.textContent = '';
+        return;
+      }
+      const hasValidChoice = Boolean(normalize(currentAddress) && currentZoneKey && Number.isFinite(currentPrice) && currentPrice > 0);
+      const isComplete = hasValidChoice && currentChoiceMatchesMemory();
+      button.disabled = !hasValidChoice || isComplete;
+      button.textContent = isComplete ? 'Обучение проведено' : 'Запомнить тариф';
+      status.hidden = false;
+      status.className = 'training-status' + (isComplete ? ' is-complete' : '');
+      if (isComplete) {
+        status.textContent = 'Тариф сохранён для этого адреса. При следующем поиске он будет подставлен автоматически.';
+      } else if (hasValidChoice) {
+        status.textContent = 'Нажми кнопку, чтобы сохранить этот тариф без добавления выезда в историю.';
+      } else {
+        status.textContent = 'Для обучения укажи адрес, выбери группу и точную цену.';
+      }
+    }
+
+    function saveRememberedRate() {
+      if (!rememberChoice()) {
+        updateTrainingUI();
+        setMessage('Нельзя сохранить тариф: укажи адрес, группу и корректную цену.', 'error');
+        return;
+      }
+      updateTrainingUI();
+      updateFileState();
+      setMessage('Обучение проведено. Тариф сохранён отдельно, запись о выезде в историю не добавлена.', 'success');
+    }
+
+    function applyRemembered() {
+      const m = readMemory()[normalize(currentAddress)];
+      if (!m || !ZONES[m.zoneKey]) return;
+      $('zoneSelect').value = m.zoneKey;
+      onZoneChange();
+      const zone = ZONES[m.zoneKey];
+      if (Number.isFinite(zone.min) && Number.isFinite(zone.max) && Number(m.price) >= zone.min && Number(m.price) <= zone.max && Number.isInteger(Number(m.price))) {
+        $('rateSelect').value = String(m.price);
+        updateRangePrice();
+      } else if (m.zoneKey === 'zone4' && m.rateMethod === 'distance' && Number.isFinite(Number(m.distanceKm)) && Number(m.distanceKm) >= 0 && Number.isSafeInteger(5000 + 250 * Number(m.distanceKm))) {
+        $('zone4Method').value = 'distance';
+        $('zone4Distance').value = String(m.distanceKm);
+        updateZone4Price();
+      }
+      $('resDesc').textContent = `${$('resDesc').textContent} Подставлен сохранённый тариф для этого адреса — проверь и при необходимости измени.`;
+      $('resultStatusText').textContent = 'Тариф подставлен из памяти · проверь';
+      updateTrainingUI();
+    }
+
+    function normalize(value) {
+      return String(value || '').toLowerCase().replace(/ё/g, 'е').normalize('NFD').replace(/и\u0306/gu, 'й').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    }
+
+    function normalizeSpokenAddress(value) {
+      let text = String(value || '').replace(/ё/giu, 'е').trim();
+      text = text.replace(/(?<![\p{L}\p{N}])(двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто)\s+(один|два|три|четыре|пять|шесть|семь|восемь|девять)(?![\p{L}\p{N}])/giu, (match, tens, units) => {
+        const unit = { один: 1, два: 2, три: 3, четыре: 4, пять: 5, шесть: 6, семь: 7, восемь: 8, девять: 9 }[normalize(units)];
+        return String(SPOKEN_TENS[normalize(tens)] + unit);
+      });
+      text = text.replace(/(?<![\p{L}\p{N}])(микрорайон|мкр\.?|микрорайона|мкрн\.?)\s+([а-яА-ЯёЁ]+)(?![\p{L}\p{N}])/gu, (match, kind, word) => {
+        const number = SPOKEN_NUMBER_WORDS[normalize(word)];
+        return number ? `${number} микрорайон` : match;
+      });
+      text = text.replace(/(?<![\p{L}\p{N}])([а-яА-ЯёЁ]+)\s+(микрорайон|мкр\.?|микрорайона|мкрн\.?)((?![\p{L}\p{N}]))/gu, (match, word, kind) => {
+        const number = SPOKEN_NUMBER_WORDS[normalize(word)];
+        return number ? `${number} микрорайон` : match;
+      });
+      text = text.replace(/(?<![\p{L}\p{N}])(микрорайон|мкр\.?|микрорайона|мкрн\.?)\s*[-№#]?\s*(\d{1,3})(?![\p{L}\p{N}])/giu, '$2 микрорайон');
+      text = text.replace(/(?<![\p{L}\p{N}])(первый|первая|первое|второй|вторая|второе|третий|третья|третье|третьи|третьего|третьем|четвертый|четвёртый|четвертая|четвёртая|четвертое|четвёртое|четвертого|четвёртого|четвертом|четвёртом|пятый|пятая|пятое|пятом|пятого|пятые|шестой|шестая|шестое|шестом|шестого|шестые|седьмой|седьмая|восьмой|восьмая|девятый|девятая|десятый|десятая|одиннадцатый|одиннадцатая|двенадцатый|двенадцатая)(?![\p{L}\p{N}])/giu, word => SPOKEN_NUMBER_WORDS[normalize(word)] || word);
+      text = text.replace(/(?<![\p{L}\p{N}])(орбита)\s+(один|два|три|четыре|пять|1|2|3|4|5)(?![\p{L}\p{N}])/giu, (match, name, number) => `${name} ${SPOKEN_NUMBER_WORDS[normalize(number)] || normalize(number)}`);
+      text = text.replace(/(?<![\p{L}\p{N}])(микрорайон|мкр\.?)\s+(орбита)\s*[-№#]?\s*(\d+)(?![\p{L}\p{N}])/giu, '$2 $3');
+      text = text.replace(/(?<![\p{L}\p{N}])мк\s*[- ]?он\s*[- ]?д?(?![\p{L}\p{N}])/giu, 'микрорайон');
+      text = text.replace(/(?<![\p{L}\p{N}])мк\s*[- ]?рн?(?![\p{L}\p{N}])/giu, 'микрорайон');
+      text = text.replace(/(?<![\p{L}\p{N}])мкр\s*[- ]?он(?![\p{L}\p{N}])/giu, 'микрорайон');
+      text = text.replace(/(?<![\p{L}\p{N}])мкр\.?(?![\p{L}\p{N}])/giu, 'микрорайон').replace(/\s+/gu, ' ').trim();
+      text = text.replace(/(?<![\p{L}\p{N}])микрорайон\s+микрорайон(?![\p{L}\p{N}])/giu, 'микрорайон');
+      text = text.replace(/(?<![\p{L}\p{N}])(\d{1,2})\s+(\d{1,3})\s+микрорайон(?![\p{L}\p{N}])/giu, '$1 микрорайон, $2');
+      return text;
+    }
+
+    function serviceAreaPoint(point) {
+      if (!isValidPoint(point)) return false;
+      const lat = Number(point[0]);
+      const lon = Number(point[1]);
+      return lat >= SERVICE_AREA.minLat && lat <= SERVICE_AREA.maxLat && lon >= SERVICE_AREA.minLon && lon <= SERVICE_AREA.maxLon && haversineKm(ALMATY_CENTER, [lat, lon]) <= SERVICE_AREA.maxDistanceKm;
+    }
+
+    function resultHasAlmatyServicePlace(result) {
+      const address = result && result.address ? result.address : {};
+      const placeText = [address.city, address.town, address.municipality, address.village, address.suburb, address.neighbourhood, address.quarter, address.residential, address.hamlet, address.city_district].filter(Boolean).map(normalize).join(' ');
+      return /(?:^|\s)(?:алматы|almaty|город алматы)(?:\s|$)/u.test(placeText) || serviceAreaPoint([Number(result && result.lat), Number(result && result.lon)]);
+    }
+
+    function filterServiceAreaResults(results) {
+      return (Array.isArray(results) ? results : []).filter(result => resultHasAlmatyServicePlace(result));
+    }
+
+    function includesPlace(haystack, keyword) {
+      const a = ` ${normalize(haystack)} `;
+      const b = ` ${normalize(keyword)} `;
+      return a.includes(b);
+    }
+
+    function formatMoney(value) {
+      return `${Math.round(Number(value) || 0).toLocaleString('ru-RU')} ₸`;
+    }
+
+    function setMessage(message, kind = '') {
+      const node = $('searchMessage');
+      node.textContent = message;
+      node.className = `search-message${kind ? ` ${kind}` : ''}`;
+    }
+
+    function setBusy(busy) {
+      $('searchBtn').disabled = busy;
+      $('streetInput').disabled = busy;
+      $('micBtn').disabled = busy;
+      $('presetSelect').disabled = busy;
+      $('searchBtn').textContent = busy ? 'Ищу адрес…' : 'Найти адрес';
+    }
+
+    function initMap() {
+      if (!window.L) {
+        $('mapPlaceholder').innerHTML = '<div><strong>Карта сейчас недоступна</strong><span>Проверь интернет-соединение. Адрес и тариф можно выбрать вручную.</span></div>';
+        return;
+      }
+      try {
+        leafletMap = L.map('map', { zoomControl: true, scrollWheelZoom: false }).setView(ALMATY_CENTER, 11);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+        }).addTo(leafletMap);
+        zonePolygon = L.polygon(ZONE1_POLYGON, {
+          color: '#2696c5', weight: 2, opacity: .85, fillColor: '#58b9e7', fillOpacity: .09, dashArray: '6 5'
+        }).addTo(leafletMap).bindTooltip('Зона 1 — ориентировочный контур по улицам прайса');
+        $('mapPlaceholder').remove();
+      } catch (error) {
+        console.warn('Не удалось инициализировать карту:', error);
+      }
+    }
+
+    function pointInPolygon(point, polygon) {
+      const x = point[1], y = point[0];
+      let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i][1], yi = polygon[i][0];
+        const xj = polygon[j][1], yj = polygon[j][0];
+        const intersects = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-12) + xi);
+        if (intersects) inside = !inside;
+      }
+      return inside;
+    }
+
+    function haversineKm(a, b) {
+      const rad = Math.PI / 180;
+      const dLat = (b[0] - a[0]) * rad;
+      const dLon = (b[1] - a[1]) * rad;
+      const lat1 = a[0] * rad, lat2 = b[0] * rad;
+      const rawH = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+      const h = Math.max(0, Math.min(1, rawH));
+      return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+    }
+
+    function isValidPoint(point) {
+      if (!Array.isArray(point) || point.length < 2 || point[0] === null || point[1] === null || point[0] === '' || point[1] === '') return false;
+      const lat = Number(point[0]), lon = Number(point[1]);
+      return Number.isFinite(lat) && Number.isFinite(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+    }
+
+    function formatDistance(km) {
+      if (km < 1) return `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(Math.round(km * 1000))} м`;
+      const digits = km < 10 ? 2 : 1;
+      return `${new Intl.NumberFormat('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(km)} км`;
+    }
+
+    function updateStraightLineDistance() {
+      const output = $('straightLineDistance');
+      const detail = $('distanceDetail');
+      if (!output || !detail) return;
+      if (!gpsPoint || !isValidPoint(gpsPoint)) {
+        output.textContent = 'GPS не определён';
+        detail.textContent = 'Чтобы рассчитать расстояние, обнови GPS кнопкой под картой.';
+        return;
+      }
+      if (!currentPoint || !isValidPoint(currentPoint)) {
+        output.textContent = '—';
+        detail.textContent = `GPS получен${Number.isFinite(gpsAccuracy) ? ` · точность ±${Math.round(gpsAccuracy)} м` : ''}. Сначала найди точку адреса.`;
+        return;
+      }
+      const km = haversineKm(gpsPoint, currentPoint);
+      if (!Number.isFinite(km)) {
+        output.textContent = '—';
+        detail.textContent = 'Не удалось вычислить расстояние по этим координатам.';
+        return;
+      }
+      output.textContent = formatDistance(km);
+      detail.textContent = `По прямой${Number.isFinite(gpsAccuracy) ? ` · точность GPS около ±${Math.round(gpsAccuracy)} м` : ''}. По дорогам расстояние будет другим.`;
+    }
+
+    function inCity(point, result) {
+      const a = result && result.address ? result.address : {};
+      const administrativeCity = [a.city, a.town, a.municipality].filter(Boolean).map(normalize);
+      return administrativeCity.some(value => ['алматы', 'almaty', 'город алматы', 'almaty city'].includes(value)) || serviceAreaPoint(point);
+    }
+
+    function matchPlaceFromResult(result, rawText) {
+      const addr = result && result.address ? result.address : {};
+      const localityFields = [addr.village, addr.town, addr.city, addr.suburb, addr.neighbourhood, addr.quarter, addr.residential, addr.hamlet, addr.municipality, addr.city_district, addr.county].filter(Boolean).join(' ');
+      const structured = normalize(localityFields);
+      const roadTokens = new Set(['улица', 'улицы', 'улице', 'улиц', 'ул', 'проспект', 'проспекта', 'проспекте', 'просп', 'пр', 'пересечение', 'перекресток', 'перекрёсток', 'дом', 'д', 'street', 'avenue', 'intersection', 'угол']);
+      const roadLike = normalize(rawText).split(' ').some(token => roadTokens.has(token));
+      const roadResult = result && (result.type === 'road' || result.addresstype === 'road' || result.class === 'highway' || addr.road);
+      const source = `${localityFields} ${roadLike || roadResult ? '' : rawText}`;
+      for (const rule of PLACE_RULES) {
+        const matchText = rule.structuredOnly ? structured : source;
+        if (rule.keys.some(key => includesPlace(matchText, key) || includesPlace(structured, key))) return rule;
+      }
+      return null;
+    }
+
+    function isRangeZone(zone) { return Boolean(zone && Number.isFinite(zone.min) && Number.isFinite(zone.max)); }
+
+    function configureRangeInput(zoneKey) {
+      const zone = ZONES[zoneKey];
+      const input = $('rateSelect');
+      input.value = '';
+      if (!isRangeZone(zone)) return;
+      input.min = String(zone.min);
+      input.max = String(zone.max);
+      input.step = '1';
+      input.placeholder = `От ${zone.min} до ${zone.max} ₸`;
+    }
+
+    function setEstimate(zoneKey, note, confidence = 'approx') {
+      const zone = ZONES[zoneKey];
+      if (!zone) return;
+      currentZoneKey = zoneKey;
+      currentPrice = zone.price == null ? null : zone.price;
+      currentZoneName = zone.zone;
+      currentNote = note || zone.desc;
+      currentRateMethod = isRangeZone(zone) ? 'range' : 'fixed';
+      currentDistanceKm = null;
+      $('resultCard').classList.remove('empty');
+      $('resZone').textContent = zone.zone;
+      $('resDesc').textContent = currentNote;
+      $('resultAdjust').hidden = false;
+      $('zoneSelect').value = zoneKey;
+      $('rangeField').hidden = !isRangeZone(zone);
+      $('zone4Field').hidden = zoneKey !== 'zone4';
+      $('zone4DistanceWrap').hidden = true;
+      $('zone4Method').value = 'fixed';
+      $('zone4Distance').value = '';
+      if (isRangeZone(zone)) {
+        configureRangeInput(zoneKey);
+        $('resPrice').textContent = zone.rangeLabel;
+        currentPrice = null;
+      } else {
+        $('rateSelect').value = '';
+        $('resPrice').textContent = formatMoney(currentPrice);
+      }
+      $('saveBtn').disabled = currentPrice == null || !currentAddress || (confidence === 'approx' && zoneKey === 'zone1');
+      $('resultStatus').hidden = false;
+      $('resultStatusText').textContent = isRangeZone(zone)
+        ? 'Укажи точную согласованную ставку в диапазоне'
+        : confidence === 'exact' ? 'Тариф определён по зоне и прайсу' : confidence === 'manual' ? 'Зона выбрана вручную' : 'Предварительно · проверь зону по прайсу';
+      $('resultCard').dataset.confidence = confidence;
+      updateTrainingUI();
+    }
+
+    function setUnclassified(note) {
+      currentZoneKey = null;
+      currentPrice = null;
+      currentZoneName = '';
+      currentNote = note;
+      currentRateMethod = 'fixed';
+      currentDistanceKm = null;
+      $('resultCard').classList.remove('empty');
+      $('resZone').textContent = 'Группа требует уточнения';
+      $('resPrice').textContent = '—';
+      $('resDesc').textContent = note;
+      $('resultAdjust').hidden = false;
+      $('zoneSelect').value = '';
+      $('rangeField').hidden = true;
+      $('zone4Field').hidden = true;
+      $('zone4DistanceWrap').hidden = true;
+      $('rateSelect').value = '';
+      $('saveBtn').disabled = true;
+      $('resultStatus').hidden = false;
+      $('resultStatusText').textContent = 'Только спорная зона требует выбора';
+      $('resultCard').dataset.confidence = 'unclassified';
+      updateTrainingUI();
+    }
+
+    function resetEstimate() {
+      currentZoneKey = null;
+      currentPrice = 0;
+      currentZoneName = '';
+      currentNote = '';
+      currentRateMethod = 'fixed';
+      currentDistanceKm = null;
+      $('resultCard').classList.add('empty');
+      $('resZone').textContent = 'Сначала укажи адрес';
+      $('resPrice').textContent = '—';
+      $('resDesc').textContent = 'Адрес будет проверен по прайсу и показан на карте.';
+      $('resultAdjust').hidden = true;
+      $('rangeField').hidden = true;
+      $('zone4Field').hidden = true;
+      $('zone4DistanceWrap').hidden = true;
+      $('zoneSelect').value = '';
+      $('rateSelect').value = '';
+      $('zone4Method').value = 'fixed';
+      $('zone4Distance').value = '';
+      $('resultStatus').hidden = true;
+      $('saveBtn').disabled = true;
+      updateTrainingUI();
+    }
+
+    function classifyPoint(point, result, rawText, forcedRule = null) {
+      if (forcedRule) {
+        setEstimate(forcedRule.zone, forcedRule.desc || ZONES[forcedRule.zone].desc, 'exact');
+        return;
+      }
+      const rule = matchPlaceFromResult(result, rawText);
+      if (rule) {
+        setEstimate(rule.zone, ZONES[rule.zone].desc, 'exact');
+        return;
+      }
+      if (pointInPolygon(point, ZONE1_POLYGON)) {
+        setEstimate('zone1', 'Точка внутри ориентировочного контура базового квадрата. Контур схематический — проверь расположение относительно улиц из прайса.', 'approx');
+        $('zoneSelect').value = '';
+        currentZoneKey = null;
+        currentPrice = null;
+        currentZoneName = '';
+        $('saveBtn').disabled = true;
+        updateTrainingUI();
+        return;
+      }
+      if (inCity(point, result)) {
+        setEstimate('zone2Range', ZONES.zone2Range.desc, 'exact');
+        return;
+      }
+      setUnclassified('По найденному адресу нельзя надёжно определить зону по утверждённым правилам. Выбери Зону 2, 3 или 4 по прайсу. Расстояние от центра города автоматически не используется.');
+    }
+
+    function projectToDiagram(point) {
+      const lonMin = 76.66, lonMax = 77.22, latMin = 43.08, latMax = 43.46;
+      const x = 38 + Math.max(0, Math.min(1, (point[1] - lonMin) / (lonMax - lonMin))) * 484;
+      const y = 20 + Math.max(0, Math.min(1, (latMax - point[0]) / (latMax - latMin))) * 220;
+      return [x, y];
+    }
+
+    function showDiagramPoint(point, label) {
+      const [x, y] = projectToDiagram(point);
+      $('diagramPin').setAttribute('display', 'inline');
+      $('diagramHalo').setAttribute('cx', x);
+      $('diagramHalo').setAttribute('cy', y);
+      $('diagramDot').setAttribute('cx', x);
+      $('diagramDot').setAttribute('cy', y);
+      $('diagramLabel').setAttribute('x', Math.min(450, x + 12));
+      $('diagramLabel').setAttribute('y', Math.max(15, y - 10));
+      $('diagramLabel').textContent = label || 'АДРЕС';
+      $('diagramCaption').textContent = 'Точка показана по найденным координатам. Схема упрощённая; контур города и зоны 1 не заменяют проверку улиц по прайсу.';
+    }
+
+    function showAddressPoint(result) {
+      const point = [Number(result.lat), Number(result.lon)];
+      if (!isValidPoint(point)) return null;
+      currentPoint = point;
+      updateStraightLineDistance();
+      const label = result.display_name || currentAddress;
+      $('mapAddress').textContent = label;
+      $('coordinates').textContent = `Адрес: ${point[0].toFixed(5)}, ${point[1].toFixed(5)}`;
+      showDiagramPoint(point, 'АДРЕС');
+      if (leafletMap) {
+        if (addressMarker) addressMarker.remove();
+        addressMarker = L.marker(point).addTo(leafletMap).bindPopup(`<strong>Адрес выезда</strong><br>${escapeHtml(label)}`).openPopup();
+        leafletMap.setView(point, result.type === 'house' || result.type === 'building' ? 17 : 15, { animate: true });
+        window.setTimeout(() => leafletMap && leafletMap.invalidateSize(), 100);
+        if (gpsMarker) gpsMarker.addTo(leafletMap);
+      }
+      const hasHouse = result.address && result.address.house_number;
+      const precision = hasHouse ? `Дом ${result.address.house_number} найден.` : 'Для пересечения улиц или района точка может быть ориентировочной.';
+      $('resultStatusText').textContent = hasHouse ? 'Найден номер дома · проверь метку' : 'Точка найдена · проверь метку на карте';
+      $('resultStatus').hidden = false;
+      return point;
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    }
+
+    function updateCandidates(items, forcedRule) {
+      geocodeCandidates = items;
+      const wrap = $('candidateWrap');
+      const select = $('candidateSelect');
+      select.replaceChildren();
+      if (items.length <= 1) {
+        wrap.hidden = true;
+        return;
+      }
+      items.forEach((item, index) => {
+        const option = document.createElement('option');
+        option.value = String(index);
+        option.textContent = item.display_name;
+        select.appendChild(option);
+      });
+      wrap.hidden = false;
+      select.onchange = () => chooseCandidate(Number(select.value), forcedRule);
+    }
+
+    function chooseCandidate(index, forcedRule = null) {
+      const candidate = geocodeCandidates[index];
+      if (!candidate) return;
+      const point = showAddressPoint(candidate);
+      if (candidate.residentialComplex && candidate.approximate) {
+        if (point) {
+          classifyPoint(point, candidate, currentAddress, forcedRule);
+          $('resDesc').textContent += ` ${candidate.locationNote || 'Точка комплекса ориентировочная; проверь расположение на карте.'}`;
+          $('resultStatusText').textContent = 'Точка ЖК ориентировочная · проверь корпус и тариф';
+          if (!forcedRule) applyRemembered();
+        }
+        return;
+      }
+      if (candidate.approximate) {
+        if (candidate.source === '2ГИС' && point) {
+          classifyPoint(point, candidate, currentAddress, forcedRule);
+          $('resDesc').textContent += ' Координата отмечена по карточке 2ГИС и служит ориентиром; проверь расположение и тариф по прайсу.';
+          $('resultStatusText').textContent += '. Координата ориентировочная — проверь зону и ставку по прайсу.';
+        } else {
+          setUnclassified(`Перекрёсток найден по справочнику (${candidate.source || 'карта'}). Точка ориентировочная — проверь метку и выбери зону и ставку по прайсу.`);
+        }
+        return;
+      }
+      if (point) classifyPoint(point, candidate, currentAddress, forcedRule);
+      if (point && !forcedRule) applyRemembered();
+    }
+
+    async function waitForGeocoderSlot() {
+      const waitMs = Math.max(0, 1100 - (Date.now() - lastGeocodeAt));
+      if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
+      lastGeocodeAt = Date.now();
+    }
+
+    const STREET_ALIASES = {
+      'абая': 'проспект Абая', 'абай': 'проспект Абая', 'абаи': 'проспект Абая',
+      'саина': 'улица Саина', 'сайна': 'улица Саина',
+      'аль фараби': 'проспект Аль-Фараби', 'фараби': 'проспект Аль-Фараби',
+      'сейфуллина': 'проспект Сейфуллина', 'сейфуллин': 'проспект Сейфуллина',
+      'рыскулова': 'проспект Рыскулова', 'достык': 'проспект Достык', 'воад': 'Восточная объездная автодорога',
+      'райымбека': 'проспект Райымбека', 'райымбек': 'проспект Райымбека',
+      'утеген батыра': 'улица Утеген батыра', 'утеген батыр': 'улица Утеген батыра', 'утеген': 'улица Утеген батыра',
+      'отеген батыра': 'улица Утеген батыра', 'отеген батыр': 'улица Утеген батыра', 'отеген': 'улица Утеген батыра',
+      'өтеген батыра': 'улица Утеген батыра', 'өтеген батыр': 'улица Утеген батыра', 'өтеген': 'улица Утеген батыра',
+      'жандосова': 'улица Жандосова', 'тимирязева': 'улица Тимирязева', 'шаляпина': 'улица Шаляпина',
+      'суюнбая': 'проспект Суюнбая', 'гоголя': 'улица Гоголя', 'сатпаева': 'улица Сатпаева',
+      'розыбакиева': 'улица Розыбакиева', 'наурызбай батыра': 'улица Наурызбай батыра',
+      'абылай хана': 'проспект Абылай хана', 'кабанбай батыра': 'улица Кабанбай батыра',
+      'толе би': 'улица Толе би', 'жибек жолы': 'проспект Жибек Жолы', 'мустафина': 'улица Мустафина',
+      'назарбаева': 'проспект Назарбаева', 'желтоксана': 'улица Желтоксан', 'желтоксан': 'улица Желтоксан',
+      'байтурсынова': 'улица Байтурсынова', 'ауэзова': 'улица Ауэзова',
+      'бухар жырау': 'бульвар Бухар Жырау', 'бухар жырау бульвар': 'бульвар Бухар Жырау',
+      'бульвар бухар жырау': 'бульвар Бухар Жырау', 'жарокова': 'улица Жарокова'
+    };
+
+    const LEGACY_STREET_ALIASES = {
+      'фурманова': 'проспект Назарбаева',
+      '1-я, 2-я, 3-я кирпично-заводская': 'улица Жубановой',
+      '10-летия комсомола': 'улица Молдагалиева',
+      '19-линия': 'улица Тажибаевой',
+      '2-я курчатова': 'улица Отрарская',
+      '21-я линия': 'улица Егизбаева',
+      '3венигородская': 'улица Кудерина',
+      '4-я кирпично-заводская': 'улица Каратаева',
+      '50-летия октября': 'улица Райымбека',
+      '60 лет комсомола': 'улица Жамакаева',
+      '60 лет ссср': 'улица Азербаева',
+      '8 линия': 'улица Ербола Сыпатаева',
+      '8 марта': 'улица Калдаякова',
+      '8-я кирпично-заводская': 'улица Кисанова',
+      'авангардная': 'улица Казыбаева',
+      'авроры': 'улица Сокпакбаева',
+      'андреевская': 'улица Пестовского',
+      'арабинская': 'улица Сокольского',
+      'армавирская': 'улица Бультриковой',
+      'аэродромная': 'улица Бокейханова',
+      'бабушкина': 'улица Кыдырбекулы',
+      'баженова': 'улица Гончарова',
+      'балтийская': 'улица Хожамьярова',
+      'барнаульская': 'улица Сарсенбаева',
+      'баумана': 'улица Тургута Озала',
+      'белинского': 'улица Жансугурова',
+      'болотникова': 'улица Дуйсенова',
+      'ботанический бульвар': 'улица Бухар Жырау, бульвар',
+      'варшавская': 'улица Дулатова',
+      'виноградова': 'улица Карасай батыра',
+      'владимирская': 'улица Си Синхая',
+      'восток-3': 'улица Янушкевича',
+      'выборгская': 'улица Ахтанова',
+      'гагарина': 'улица Паклиевского',
+      'городская': 'улица Бекхожина',
+      'горького': 'улица Жибек жолы',
+      'гражданская': 'улица Базарбаева',
+      'грушовая': 'улица Зверева',
+      'дачная': 'улица Бегалина',
+      'дежнева': 'улица Сулейменова',
+      'дзержинского': 'улица Наурызбай батыра',
+      'домостроительная': 'улица Улугбека',
+      'донорская': 'улица Койчуманова',
+      'дунайская': 'улица Сидоркина',
+      'емелева': 'улица Абдуллиных',
+      'жамбыла жабаева': 'улица Розы Баглановой',
+      'жданова': 'улица Шакарима',
+      'железноводская': 'улица Акпаева',
+      'заводская': 'улица Елебекова',
+      'закарпатская': 'улица Ахматова',
+      'заломова': 'улица Ровенского',
+      'западная': 'улица Ескараева',
+      'звездная': 'улица Беспакова',
+      'ильича': 'улица Есенова',
+      'кавалерийская': 'улица Ашимбаева',
+      'казачья': 'улица Потанина',
+      'калинина': 'улица Кабанбай батыра',
+      'карла маркса': 'улица Кунаева',
+      'кирова': 'улица Богенбай батыра',
+      'кихтенко': 'улица Байкадамова',
+      'клеверная': 'улица Есенберлина',
+      'коммунистический': 'улица Абылай хана',
+      'комсомольская': 'улица Толе би',
+      'красина': 'улица Валиханова',
+      'красноармейская': 'улица Бейсебаева',
+      'красногвардейский тракт': 'улица Суюнбая',
+      'красных партизан': 'улица Иштвана Коныра',
+      'кремлевская': 'улица Майлина',
+      'левона мирзояна': 'улица Шафик Чокина',
+      'ленинградская': 'улица Гете',
+      'ленинская смена': 'улица Ахан Серэ',
+      'лесная': 'улица Омарова',
+      'липецкая': 'улица Айбасова',
+      'локомотивная': 'улица Аймауытова',
+      'луначарского': 'улица Ниязбекова',
+      'магнитогорская': 'улица Ногайбаева',
+      'мате залки': 'улица Утеген батыра',
+      'маяковского': 'улица Джабаева',
+      'мельничная': 'улица Курмангалиева',
+      'мечникова': 'улица Шарипова',
+      'микояна': 'улица Шокай',
+      'мира': 'улица Желтоксан',
+      'мичурина': 'улица Досмухамедова',
+      'многоводная': 'улица Орманова',
+      'молодежная': 'улица Махамбета Утемисова',
+      'мориса тореза': 'улица Радостовца',
+      'новосельская': 'улица Колпаковского',
+      'новочеркасская': 'улица Булкушева',
+      'обручева': 'улица Рыскулбекова',
+      'овчарова': 'улица Ходжанова',
+      'охотская': 'улица Иванова-Сокольского',
+      'пастера': 'улица Макатаева',
+      'патриса лумумбы': 'улица Озтюрка',
+      'петрова': 'улица Емцова',
+      'пионерская': 'улица Майбороды',
+      'подгорная': 'улица Кастеева',
+      'порт-артура': 'улица Садвакасова',
+      'пригородная': 'улица Жургенова',
+      'пролетарская': 'улица Зенкова',
+      'речная': 'улица Кармысова',
+      'ровенская': 'улица Кожабекова',
+      'розовая': 'улица Ратушного',
+      'розы люксембург': 'улица Кулымбетова',
+      'руднева': 'улица Брусиловского',
+      'севанская': 'улица Бокеева',
+      'северная': 'улица Болтирикшешена',
+      'седова': 'улица Торекулова',
+      'семипалатинская': 'улица Тобаякова',
+      'слободская': 'улица Молдагуловой',
+      'советская': 'улица Казыбек би',
+      'советской конституции': 'улица Бекмаханова',
+      'солонцовая': 'улица Ахмедсафина',
+      'сормовская': 'улица Никольской',
+      'софьи ковалевской': 'улица Тлендиева',
+      'спортивная': 'улица Сауранбаева',
+      'студенческая': 'улица Юрия Кима',
+      'талгарская': 'улица Каирбекова',
+      'тесленко': 'улица Жумабаева',
+      'тополевская': 'улица Бартольда',
+      'туруханская': 'улица Суонио',
+      'университетская': 'улица Шашкина',
+      'ушакова': 'улица Прокофьева',
+      'федеративная': 'улица Ержанова',
+      'фестивальная': 'улица Токтабаева',
+      'фрунзе': 'улица Торайгырова',
+      'хлебная': 'улица Байтасова',
+      'ххiii-го партсъезда': 'улица Физули',
+      'цветочная': 'улица Серикова',
+      'центральная': 'улица Яссауи',
+      'чапаева': 'улица Манаса',
+      'чукотская': 'улица Мусина',
+      'шверника': 'улица Тынышбаева',
+      'юных коммунаров': 'улица Алимжанова'
+    };
+
+    // Координаты пересечений взяты из карточек 2ГИС и служат только ориентиром для точки.
+    // https://2gis.kz/almaty/geo/70030076161245947
+    // https://2gis.kz/almaty/geo/70030076161246224
+    const KNOWN_INTERSECTIONS = {
+      'проспект абая|улица саина': { lat: 43.220029, lon: 76.851272, label: 'проспект Абая × улица Саина', source: '2ГИС' },
+      'бульвар бухар жырау|улица ауэзова': { lat: 43.230866, lon: 76.905151, label: 'бульвар Бухар Жырау × улица Ауэзова', source: '2ГИС' },
+      'проспект абая|улица утеген батыра': { lat: 43.231966, lon: 76.86911, label: 'проспект Абая × улица Утеген батыра', source: '2ГИС' }
+    };
+
+    function parseIntersection(rawText) {
+      let value = String(rawText || '').trim();
+      const explicitIntersection = normalize(value).split(' ').some(token => ['пересечение', 'пересечении', 'перекресток', 'перекрёсток', 'угол', 'углу'].includes(token));
+      value = value.replace(/^\s*(?:(?:на\s+)?пересечении|пересечение|перекресток|перекрёсток)\s+(?:(?:улиц(?:ы)?|улицы|дорог)\s+)?/iu, '');
+      let parts = null;
+      for (const separator of [/\s+(?:и|с|and)\s+/iu, /\s+[—–-]\s+/u, /\s*\/\s*/u, /\s*,\s*/u]) {
+        const split = value.split(separator);
+        if (split.length === 2) { parts = split; break; }
+      }
+      const ignored = new Set(['улица', 'улицы', 'улиц', 'улице', 'улицу', 'ул', 'проспект', 'проспекта', 'проспекте', 'просп', 'пр', 'переулок', 'пер', 'пересечение', 'пересечении', 'перекресток', 'перекрёсток', 'дорога', 'дорог', 'дом', 'д', 'угол', 'углу', 'на', 'в', 'и', 'с', 'and', 'между', 'город', 'г', 'алматы', 'казахстан', 'қазақстан']);
+      if (!parts) {
+        const tokens = normalize(value).split(' ').filter(token => token && !ignored.has(token) && !/^\d+$/.test(token));
+        for (let splitAt = 1; splitAt < tokens.length; splitAt++) {
+          const left = tokens.slice(0, splitAt).join(' ');
+          const right = tokens.slice(splitAt).join(' ');
+          if ((STREET_ALIASES[left] || LEGACY_STREET_ALIASES[left]) && (STREET_ALIASES[right] || LEGACY_STREET_ALIASES[right])) { parts = [left, right]; break; }
+        }
+      }
+      if (!parts) return null;
+      const clean = part => normalize(part).split(' ').filter(token => token && !ignored.has(token) && !/^\d+$/.test(token)).join(' ');
+      const streetA = clean(parts[0]), streetB = clean(parts[1]);
+      if (streetA.length < 2 || streetB.length < 2) return null;
+      const placePair = [streetA, streetB].sort().join('|');
+      const groupedPlaces = new Set([
+        ['Абай', 'Райымбек'], ['Аэропорт', 'Жулдыз'], ['Боралдай', 'Бурундай'],
+        ['ГРЭС', 'Отеген-Батыр'], ['Каменка', 'Таусамалы'], ['Зердели', 'Саялы']
+      ].map(pair => pair.map(normalize).sort().join('|')));
+      if (!explicitIntersection && groupedPlaces.has(placePair)) return null;
+      return { streetA, streetB };
+    }
+
+    function canonicalStreetName(name) {
+      const key = normalize(name);
+      return STREET_ALIASES[key] || LEGACY_STREET_ALIASES[key] || name;
+    }
+
+    function escapeRegExp(value) {
+      return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function canonicalizeLegacyStreetInText(value) {
+      let text = String(value || '');
+      Object.keys(LEGACY_STREET_ALIASES).sort((a, b) => b.length - a.length).forEach(alias => {
+        const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(alias)}(?![\\p{L}\\p{N}])`, 'giu');
+        text = text.replace(pattern, LEGACY_STREET_ALIASES[alias]);
+      });
+      return text;
+    }
+
+    async function nominatimSearch(query, options = {}) {
+      await waitForGeocoderSlot();
+      const params = new URLSearchParams({
+        format: 'jsonv2', addressdetails: '1', limit: String(options.limit || 5), countrycodes: 'kz', bounded: '1',
+        viewbox: `${SERVICE_AREA.minLon},${SERVICE_AREA.maxLat},${SERVICE_AREA.maxLon},${SERVICE_AREA.minLat}`, q: query
+      });
+      if (options.geometry) params.set('polygon_geojson', '1');
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
+        headers: { 'Accept': 'application/json', 'Accept-Language': 'ru,kk,en' }
+      });
+      if (!response.ok) throw new Error(`Сервис поиска ответил ${response.status}`);
+      const results = await response.json();
+      return filterServiceAreaResults(results);
+    }
+
+    async function geocode(query) {
+      const normalized = canonicalizeLegacyStreetInText(normalizeSpokenAddress(query));
+      const variants = [normalized];
+      const microdistrict = normalized.match(/(?<![\p{L}\p{N}])(\d{1,2})\s+микрорайон[\s,;.-]*(?:дом\s*)?([0-9]+[а-яa-z]?(?:\/[0-9]+)?)?/iu);
+      if (microdistrict) {
+        const number = microdistrict[1];
+        const houseNumber = microdistrict[2] || '';
+        const house = houseNumber ? `, дом ${houseNumber}` : '';
+        variants.push(`${number}-й микрорайон${house}`);
+        variants.push(`${number} мкр${house}`);
+        variants.push(`${number} мкрн${house}`);
+        variants.push(`микрорайон ${number}${house}`);
+        if (houseNumber) variants.push(`${number} микрорайон, ${houseNumber}`);
+      }
+      const orbita = normalized.match(/(?<![\p{L}\p{N}])орбита\s*[- ]?([1-4])[\s,;.-]*(?:дом\s*)?([0-9]+[а-яa-z]?(?:\/[0-9]+)?)?/iu);
+      if (orbita) {
+        const number = orbita[1];
+        const houseNumber = orbita[2] || '';
+        const house = houseNumber ? `, дом ${houseNumber}` : '';
+        variants.push(`микрорайон Орбита-${number}${house}`);
+        variants.push(`Орбита-${number}${house}`);
+        variants.push(`Орбита ${number}${house}`);
+        variants.push(`мкр Орбита-${number}${house}`);
+        if (houseNumber) variants.push(`Орбита-${number}, ${houseNumber}`);
+      }
+      const uniqueVariants = [...new Set(variants)];
+      let results = [];
+      for (const variant of uniqueVariants) {
+        const queryText = /(?:алматы|almaty|казахстан|qazaqstan)/iu.test(variant) ? variant : `${variant}, Алматы, Казахстан`;
+        results = await nominatimSearch(queryText, { limit: 10 });
+        if (results.length) break;
+      }
+      return results;
+    }
+
+    const RESIDENTIAL_COMPLEXES = [
+      {
+        id: 'legenda',
+        title: 'ЖК Legenda',
+        aliases: ['legenda', 'легенда', 'леганда'],
+        point: {
+          lat: 43.241478,
+          lon: 76.910045,
+          label: 'между проспектом Абая, улицей Манаса и улицей Чокина',
+          road: 'проспект Абая',
+          source: 'Яндекс.Карты',
+          approximate: true,
+          locationNote: 'Точка комплекса ориентировочная, так как у ЖК несколько корпусов. Проверь расположение на карте.'
+        }
+      },
+      {
+        id: 'exclusive-duet',
+        title: 'Exclusive Duet',
+        aliases: ['exclusive duet', 'эксклюзив дует', 'эксклюзив дуэт'],
+        point: {
+          lat: 43.240624,
+          lon: 76.937353,
+          label: 'проспект Абая, 28а',
+          road: 'проспект Абая',
+          houseNumber: '28а',
+          source: 'Яндекс.Карты',
+          approximate: true,
+          locationNote: 'Метка относится к комплексу по адресу Абая, 28а. Проверь нужный корпус.'
+        }
+      },
+      {
+        id: 'orion-3',
+        title: 'Orion 3',
+        aliases: ['orion 3', 'орион 3', 'орион три', 'орион третий'],
+        point: {
+          lat: 43.230897,
+          lon: 76.944917,
+          label: 'проспект Аль-Фараби, 15/1',
+          road: 'проспект Аль-Фараби',
+          houseNumber: '15/1',
+          source: 'Яндекс.Карты',
+          approximate: true,
+          locationNote: 'Проверь корпус Orion 3 на карте перед сохранением выезда.'
+        }
+      },
+      {
+        id: 'first-by-bi',
+        title: '1st by BI',
+        aliases: ['1st by bi', 'first by bi', '1st би', 'first би', 'ферст бай би', 'фёрст бай би', 'первый бай би'],
+        point: {
+          lat: 43.195324,
+          lon: 76.874438,
+          label: 'улица Саина, 1а/1',
+          road: 'улица Саина',
+          houseNumber: '1а/1',
+          source: '2ГИС',
+          approximate: true,
+          locationNote: 'Точка взята из карточки комплекса 2ГИС. Проверь метку на карте.'
+        }
+      },
+      {
+        id: 'lumiere',
+        title: 'Lumiere',
+        aliases: ['lumiere', 'люмьер', 'люмьер', 'люмиер'],
+        point: {
+          lat: 43.2217309,
+          lon: 76.9291143,
+          label: 'проспект Аль-Фараби, 69А',
+          road: 'проспект Аль-Фараби',
+          houseNumber: '69А',
+          suburb: 'Коктем',
+          source: 'OpenStreetMap',
+          approximate: false,
+          locationNote: 'Найден номер дома 69А.'
+        }
+      },
+      {
+        id: 'millennium-park',
+        title: 'Millennium Park',
+        aliases: ['millennium park', 'millenium park', 'миллениум парк', 'миллениум', 'millennium', 'millenium'],
+        point: {
+          lat: 43.261426,
+          lon: 76.904421,
+          label: 'улица Ауэзова, 2/8, блок 2',
+          road: 'улица Ауэзова',
+          houseNumber: '2/8, блок 2',
+          suburb: 'Алмалинский район',
+          source: 'Яндекс.Карты',
+          approximate: true,
+          locationNote: 'Точка относится к блоку 2 по адресу Ауэзова, 2/8.'
+        }
+      },
+      {
+        id: 'millenium-clubhouse',
+        title: 'Клубный дом Millenium',
+        aliases: ['клубный дом millenium', 'клубный дом millennium', 'клубный дом миллениум', 'millenium клубный дом', 'millennium клубный дом'],
+        point: {
+          lat: 43.193231,
+          lon: 76.921504,
+          label: 'улица Жангир хана, 25',
+          road: 'улица Жангир хана',
+          houseNumber: '25',
+          suburb: 'Ерменсай',
+          source: '2ГИС',
+          approximate: true,
+          locationNote: 'Точка взята из карточки клубного дома по адресу Жангир хана, 25.'
+        }
+      },
+      {
+        id: 'kristall',
+        title: 'ЖК Кристалл',
+        aliases: ['кристалл', 'kristall', 'crystal'],
+        clarification: 'Не ставлю точку ЖК «Кристалл» автоматически: адрес Абая, 130/3 не совпадает с карточками ЖК. Карты относят ЖК «Кристалл» к проспекту Абая, 160, где есть несколько корпусов. Укажи подтверждённый корпус на Абая, 160 или проверь, тот ли комплекс нужен.'
+      },
+      {
+        id: 'diamond',
+        title: 'Diamond',
+        aliases: ['diamond', 'даймонд'],
+        point: {
+          lat: 43.201442,
+          lon: 76.895404,
+          label: 'улица Брауна, 24/4',
+          road: 'улица Брауна',
+          houseNumber: '24/4',
+          source: '2ГИС',
+          approximate: true,
+          locationNote: 'Точка взята из карточки ЖК по адресу Брауна, 24/4.'
+        }
+      },
+      {
+        id: 'mechta-minina',
+        title: 'Мечта на Минина',
+        aliases: ['мечта на минина', 'мечта минина', 'mechta na minina'],
+        point: {
+          lat: 43.235393,
+          lon: 76.924593,
+          label: 'улица Минина, 24',
+          road: 'улица Минина',
+          houseNumber: '24',
+          source: '2ГИС',
+          approximate: true,
+          locationNote: 'Точка взята из карточки ЖК по адресу Минина, 24.'
+        }
+      },
+      {
+        id: 'rams-city',
+        title: 'Rams City',
+        aliases: ['rams city', 'рамс сити', 'rams сити'],
+        point: {
+          lat: 43.221983,
+          lon: 76.884443,
+          label: 'улица Жандосова, 94а',
+          road: 'улица Жандосова',
+          houseNumber: '94а',
+          source: '2ГИС',
+          approximate: true,
+          locationNote: 'Точка взята по адресу Жандосова, 94а. Проверь метку на карте.'
+        }
+      },
+      {
+        id: 'riviera-plus',
+        title: 'Riviera Plus',
+        aliases: ['riviera plus', 'ривьера плюс', 'ривьера плас'],
+        point: {
+          lat: 43.229228,
+          lon: 76.878224,
+          label: 'улица Сатпаева, 90/59, блок 19',
+          road: 'улица Сатпаева',
+          houseNumber: '90/59, блок 19',
+          source: '2ГИС',
+          approximate: true,
+          locationNote: 'Точка относится к блоку 19 по адресу Сатпаева, 90/59.'
+        }
+      },
+      {
+        id: 'dynasty',
+        title: 'Династия',
+        aliases: ['династия', 'dynasty'],
+        point: {
+          lat: 43.200365,
+          lon: 76.93058,
+          label: 'улица Жаксылык Ушкемпирова, 38',
+          road: 'улица Жаксылык Ушкемпирова',
+          houseNumber: '38',
+          source: '2ГИС',
+          approximate: true,
+          locationNote: 'Точка взята из карточки комплекса по адресу Ушкемпирова, 38.'
+        }
+      },
+      {
+        id: 'silver-hills',
+        title: 'Silver Hills',
+        aliases: ['silver hills', 'сильвер хиллс', 'сильвер хилс'],
+        point: {
+          lat: 43.197057,
+          lon: 76.930873,
+          label: 'улица Жаксылык Ушкемпирова, 42, блок Б',
+          road: 'улица Жаксылык Ушкемпирова',
+          houseNumber: '42, блок Б',
+          source: '2ГИС',
+          approximate: true,
+          locationNote: 'Метка относится к блоку Б. Если нужен другой корпус Silver Hills, уточни его номер.'
+        }
+      },
+      {
+        id: 'baiqadam',
+        title: 'Baiqadam',
+        aliases: ['baiqadam', 'байкадам', 'бай кадам'],
+        point: {
+          lat: 43.213251,
+          lon: 76.89383,
+          label: 'улица Байкадамова, 18а',
+          road: 'улица Байкадамова',
+          houseNumber: '18а',
+          source: '2ГИС',
+          approximate: true,
+          locationNote: 'Точка взята по адресу Байкадамова, 18а.'
+        }
+      },
+      {
+        id: 'estet',
+        title: 'Estet',
+        aliases: ['estet', 'эстет'],
+        clarification: 'По ЖК Estet карты расходятся: 2ГИС указывает Розыбакиева, 197/2, а Яндекс.Карты — 217к8; для 197/2 точную точку дома подтвердить не удалось. Не выбираю адрес автоматически. Укажи точный адрес или корпус.'
+      },
+      {
+        id: 'tumar',
+        title: 'ЖК Тумар',
+        aliases: ['tumar', 'тумар'],
+        point: {
+          lat: 43.232121,
+          lon: 76.892274,
+          label: 'карточка жилого комплекса на карте 2ГИС',
+          road: 'улица Радостовца',
+          suburb: 'Бостандыкский район',
+          source: '2ГИС',
+          approximate: true,
+          locationNote: 'В карточке ЖК Тумар точный корпус не указан. Точка служит ориентиром; проверь её на карте.'
+        }
+      },
+      {
+        id: 'alma-villa',
+        title: 'Alma Villa',
+        aliases: ['alma villa', 'алма вилла', 'alma vila'],
+        point: {
+          lat: 43.178839,
+          lon: 76.923735,
+          label: 'улица Талды, 63, микрорайон Ерменсай',
+          road: 'улица Талды',
+          houseNumber: '63',
+          suburb: 'Ерменсай',
+          source: '2ГИС',
+          approximate: true,
+          locationNote: 'Точка взята по адресу Талды, 63.'
+        }
+      },
+      {
+        id: 'ayala-park',
+        title: 'Ayala Park',
+        aliases: ['ayala park', 'аяла парк', 'аялапарк'],
+        point: {
+          lat: 43.226636,
+          lon: 76.880558,
+          label: 'улица Тлендиева, 345',
+          road: 'улица Тлендиева',
+          houseNumber: '345',
+          source: 'Яндекс.Карты',
+          approximate: true,
+          locationNote: 'Точка взята из карточки комплекса по адресу Тлендиева, 345.'
+        }
+      },
+      {
+        id: 'mega-tower',
+        title: 'Mega Tower Almaty',
+        aliases: ['mega tower almaty', 'mega tower', 'megatower almaty', 'мега тауэр алматы', 'мега тауэр', 'мегатауэр алматы', 'мегатауэр'],
+        requireChoice: true,
+        points: [
+          { lat: 43.2032383, lon: 76.8903801, label: 'блок 5 · 264/5', road: 'улица Абиша Кекилбайулы', houseNumber: '264/5', source: 'OpenStreetMap', approximate: false, locationNote: 'Точная адресная точка корпуса 264/5.' },
+          { lat: 43.2034988, lon: 76.8907718, label: 'блок 6 · 264/6', road: 'улица Абиша Кекилбайулы', houseNumber: '264/6', source: 'OpenStreetMap', approximate: false, locationNote: 'Точная адресная точка корпуса 264/6.' },
+          { lat: 43.2038022, lon: 76.8901596, label: 'блок 7 · 264/7', road: 'улица Абиша Кекилбайулы', houseNumber: '264/7', source: 'OpenStreetMap', approximate: false, locationNote: 'Точная адресная точка корпуса 264/7.' },
+          { lat: 43.2000297, lon: 76.8906921, label: 'блок 1 · 270/1', road: 'улица Абиша Кекилбайулы', houseNumber: '270/1', source: 'OpenStreetMap', approximate: false, locationNote: 'Точная адресная точка корпуса 270/1.' },
+          { lat: 43.2003369, lon: 76.8909822, label: 'блок 2 · 270/2', road: 'улица Абиша Кекилбайулы', houseNumber: '270/2', source: 'OpenStreetMap', approximate: false, locationNote: 'Точная адресная точка корпуса 270/2.' },
+          { lat: 43.2010375, lon: 76.8909740, label: 'блок 3 · 270/3', road: 'улица Абиша Кекилбайулы', houseNumber: '270/3', source: 'OpenStreetMap', approximate: false, locationNote: 'Точная адресная точка корпуса 270/3.' }
+        ]
+      },
+      {
+        id: 'hayat-astoria',
+        title: 'Hayat Astoria',
+        aliases: ['hayat astoria', 'hayat astoria алматы', 'хаят астория', 'хайат астория', 'хаят асториа'],
+        point: {
+          lat: 43.188126,
+          lon: 76.917693,
+          label: 'микрорайон Нур Алатау, 134 к1е',
+          road: 'микрорайон Нур Алатау',
+          houseNumber: '134 к1е',
+          suburb: 'Нур Алатау',
+          source: '2ГИС',
+          approximate: true,
+          locationNote: 'Точка относится к адресу Нур Алатау, 134 к1е. Проверь корпус.'
+        }
+      },
+      {
+        id: 'remizovka',
+        title: 'Ремизовка',
+        aliases: ['ремизовка', 'remizovka'],
+        requireChoice: true,
+        points: [
+          { lat: 43.198231, lon: 76.931067, label: 'улица Алаша, 16/1', road: 'улица Алаша', houseNumber: '16/1', suburb: 'Ерменсай', source: '2ГИС', approximate: true, locationNote: 'Точка корпуса 16/1 по карточке 2ГИС.' },
+          { lat: 43.198178, lon: 76.931593, label: 'улица Алаша, 16/2', road: 'улица Алаша', houseNumber: '16/2', suburb: 'Ерменсай', source: '2ГИС', approximate: true, locationNote: 'Точка корпуса 16/2 по карточке 2ГИС.' },
+          { lat: 43.198117, lon: 76.932105, label: 'улица Алаша, 16/3', road: 'улица Алаша', houseNumber: '16/3', suburb: 'Ерменсай', source: '2ГИС', approximate: true, locationNote: 'Точка корпуса 16/3 по карточке 2ГИС.' },
+          { lat: 43.198072, lon: 76.932808, label: 'улица Алаша, 16/4', road: 'улица Алаша', houseNumber: '16/4', suburb: 'Ерменсай', source: 'Яндекс.Карты', approximate: true, locationNote: 'Точка корпуса 16/4 по карточке Яндекс.Карт.' }
+        ]
+      },
+      {
+        id: 'zhaily',
+        title: 'ЖК Жайлы',
+        aliases: ['жайлы', 'zhaily', 'zhayly', 'zhaili', 'жайлы жк'],
+        point: {
+          lat: 43.2492175,
+          lon: 76.866729,
+          label: 'улица Толе би, 273/4',
+          road: 'улица Толе би',
+          houseNumber: '273/4',
+          source: 'OpenStreetMap',
+          approximate: false,
+          locationNote: 'Найден точный адрес дома 273/4.'
+        }
+      },
+      {
+        id: 'almaly-residential-area',
+        title: 'Жилой район Алмалы',
+        aliases: ['алмалы', 'жилой район алмалы', 'жр алмалы'],
+        clarification: 'Жилой район «Алмалы» включает много домов, одной точки выезда у него нет. Укажи улицу и номер дома или конкретный корпус.'
+      }
+    ];
+
+    const RESIDENTIAL_COMPLEX_BY_ALIAS = new Map();
+    RESIDENTIAL_COMPLEXES.forEach(complex => {
+      complex.aliases.forEach(alias => RESIDENTIAL_COMPLEX_BY_ALIAS.set(normalize(alias), complex));
+    });
+
+    function isResidentialComplexQuery(rawText) {
+      return /(?:^|\s)(?:жк|жилой комплекс|клубный дом|жилой район|жр)(?:\s|$)/u.test(normalize(rawText));
+    }
+
+    function hasExplicitHouseNumber(rawText) {
+      return /\d/u.test(normalize(rawText));
+    }
+
+    function findResidentialComplex(rawText) {
+      const normalized = normalize(rawText);
+      const containsCrystal = /(?:^|\s)(?:кристалл|kristall|crystal)(?:\s|$)/u.test(normalized);
+      if (containsCrystal) {
+        const confirmedBuilding = /(?:^|\s)160\s+(?:к|корпус)\s+\d+/u.test(normalized);
+        if (!confirmedBuilding) return RESIDENTIAL_COMPLEX_BY_ALIAS.get('кристалл');
+        return null;
+      }
+      const containsEstet = /(?:^|\s)(?:estet|эстет)(?:\s|$)/u.test(normalized);
+      if (containsEstet) {
+        const exactUnverifiedAddress = /(?:^|\s)197\s+2(?:\s|$)/u.test(normalized);
+        const confirmedAlternateAddress = /(?:^|\s)217\s+8(?:\s|$)/u.test(normalized);
+        if (exactUnverifiedAddress || (!hasExplicitHouseNumber(rawText) && !confirmedAlternateAddress)) {
+          return RESIDENTIAL_COMPLEX_BY_ALIAS.get('estet');
+        }
+        return null;
+      }
+      if (/(?:^|\s)клубный дом(?:\s|$)/u.test(normalized) && /(?:millenium|millennium|миллениум)/u.test(normalized)) {
+        return RESIDENTIAL_COMPLEX_BY_ALIAS.get('клубный дом millenium');
+      }
+      const key = normalized
+        .replace(/^(?:(?:жк|жилой комплекс|жилой район|жр)\s+)/u, '')
+        .replace(/\b(?:алматы|almaty|казахстан|qazaqstan|бостандыкский|алмалинский|алатауский|район|город)\b/gu, ' ')
+        .replace(/\s+/gu, ' ')
+        .trim();
+      return RESIDENTIAL_COMPLEX_BY_ALIAS.get(key) || null;
+    }
+
+    function makeResidentialCandidate(complex, point) {
+      const address = { city: 'Алматы' };
+      if (point.road) address.road = point.road;
+      if (point.houseNumber) address.house_number = point.houseNumber;
+      if (point.suburb) address.suburb = point.suburb;
+      return {
+        lat: String(point.lat),
+        lon: String(point.lon),
+        type: point.houseNumber ? 'house' : 'residential_complex',
+        addresstype: point.houseNumber ? 'house' : 'building',
+        class: 'building',
+        display_name: `${complex.title} · ${point.label}, Алматы, Казахстан`,
+        address,
+        approximate: Boolean(point.approximate),
+        residentialComplex: true,
+        source: point.source || 'картографический справочник ЖК',
+        locationNote: point.locationNote || 'Проверь точку и корпус на карте.'
+      };
+    }
+
+    function getResidentialCandidates(complex) {
+      if (Array.isArray(complex.points)) return complex.points.map(point => makeResidentialCandidate(complex, point));
+      if (complex.point) return [makeResidentialCandidate(complex, complex.point)];
+      return [];
+    }
+
+    function showResidentialCandidateChoices(items, complex, forcedRule) {
+      geocodeCandidates = items;
+      const wrap = $('candidateWrap');
+      const select = $('candidateSelect');
+      select.replaceChildren();
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = 'Выбери корпус ЖК';
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      select.appendChild(placeholder);
+      items.forEach((item, index) => {
+        const option = document.createElement('option');
+        option.value = String(index);
+        option.textContent = item.display_name;
+        select.appendChild(option);
+      });
+      select.value = '';
+      wrap.hidden = false;
+      $('mapAddress').textContent = `Для ${complex.title} найдено несколько корпусов. Выбери нужный корпус в списке.`;
+      $('coordinates').textContent = 'Координаты адреса: —';
+      $('resultStatus').hidden = false;
+      $('resultStatusText').textContent = 'Выбери корпус, чтобы поставить точную точку выезда';
+      select.onchange = () => {
+        if (select.value === '') return;
+        const index = Number(select.value);
+        const candidate = geocodeCandidates[index];
+        if (!candidate) return;
+        chooseCandidate(index, forcedRule);
+        setMessage(`${candidate.display_name}. Проверь метку на карте перед сохранением выезда.`, 'success');
+      };
+      setMessage(`Для ${complex.title} есть несколько корпусов. Выбери нужный адрес в списке — точка и расстояние будут рассчитаны до него.`);
+    }
+
+    function roadLineParts(item, expectedStreet) {
+      const address = item.address || {};
+      const roadLabel = normalize(`${address.road || ''} ${(item.display_name || '').split(',')[0]}`);
+      const streetTokens = normalize(expectedStreet).split(' ').filter(token => !['улица', 'улицы', 'ул', 'проспект', 'просп', 'пр', 'дорога'].includes(token));
+      if (!streetTokens.length || !streetTokens.every(token => includesPlace(roadLabel, token))) return [];
+      const geo = item.geojson || {};
+      if (geo.type === 'LineString' && Array.isArray(geo.coordinates)) return [geo.coordinates];
+      if (geo.type === 'MultiLineString' && Array.isArray(geo.coordinates)) return geo.coordinates;
+      return [];
+    }
+
+    function isAlmatyRoadResult(item) {
+      return resultHasAlmatyServicePlace(item);
+    }
+
+    async function geocodeIntersection(pair) {
+      const streetA = canonicalStreetName(pair.streetA);
+      const streetB = canonicalStreetName(pair.streetB);
+      const knownKey = [normalize(streetA), normalize(streetB)].sort().join('|');
+      const known = KNOWN_INTERSECTIONS[knownKey];
+      if (known) {
+        return [{
+          lat: String(known.lat), lon: String(known.lon), type: 'intersection', addresstype: 'road',
+          class: 'highway', approximate: true, source: known.source,
+          display_name: `Перекрёсток ${known.label}, Алматы, Казахстан · точка ориентировочная`,
+          address: { city: 'Алматы', road: known.label }
+        }];
+      }
+      const queryA = `${streetA}, Алматы, Казахстан`;
+      const queryB = `${streetB}, Алматы, Казахстан`;
+      // Последовательно: публичный Nominatim ограничивает частоту запросов.
+      const firstResults = await nominatimSearch(queryA, { limit: 40, geometry: true });
+      const secondResults = await nominatimSearch(queryB, { limit: 40, geometry: true });
+      const firstNodes = new Map();
+      for (const item of firstResults || []) {
+        if (!isAlmatyRoadResult(item)) continue;
+        for (const line of roadLineParts(item, streetA)) {
+          for (const coordinate of line) {
+            const lon = Number(coordinate[0]), lat = Number(coordinate[1]);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+            firstNodes.set(`${lat.toFixed(6)},${lon.toFixed(6)}`, [lat, lon]);
+          }
+        }
+      }
+      const points = new Map();
+      for (const item of secondResults || []) {
+        if (!isAlmatyRoadResult(item)) continue;
+        for (const line of roadLineParts(item, streetB)) {
+          for (const coordinate of line) {
+            const lon = Number(coordinate[0]), lat = Number(coordinate[1]);
+            const key = `${lat.toFixed(6)},${lon.toFixed(6)}`;
+            if (firstNodes.has(key)) points.set(key, firstNodes.get(key));
+          }
+        }
+      }
+      const geometryResults = [...points.values()]
+        .sort((a, b) => haversineKm(ALMATY_CENTER, a) - haversineKm(ALMATY_CENTER, b))
+        .slice(0, 10)
+        .map((point, index) => ({
+          lat: String(point[0]), lon: String(point[1]), type: 'intersection', addresstype: 'road',
+          class: 'highway', approximate: false,
+          display_name: `Пересечение ${streetA} × ${streetB}${points.size > 1 ? ` · вариант ${index + 1}` : ''}, Алматы, Казахстан`,
+          address: { city: 'Алматы', road: `${streetA} × ${streetB}` }
+        }));
+      if (geometryResults.length) return geometryResults;
+
+      const directQueries = [
+        `${streetA} и ${streetB}, Алматы, Казахстан`,
+        `${streetB} и ${streetA}, Алматы, Казахстан`,
+        `${streetA} × ${streetB}, Алматы, Казахстан`,
+        `пересечение ${streetA} и ${streetB}, Алматы, Казахстан`,
+        `${streetA}, ${streetB}, Алматы, Казахстан`
+      ];
+      const directCandidates = [];
+      for (const directQuery of directQueries) {
+        const directResults = await nominatimSearch(directQuery, { limit: 10 });
+        for (const item of directResults || []) {
+          const point = [Number(item.lat), Number(item.lon)];
+          if (!serviceAreaPoint(point)) continue;
+          directCandidates.push({
+            lat: String(point[0]),
+            lon: String(point[1]),
+            type: 'intersection',
+            addresstype: 'road',
+            class: 'highway',
+            approximate: true,
+            source: 'OpenStreetMap',
+            display_name: `Пересечение ${streetA} × ${streetB}, Алматы, Казахстан · точка ориентировочная`,
+            address: { city: 'Алматы', road: `${streetA} × ${streetB}` }
+          });
+        }
+        if (directCandidates.length) break;
+      }
+      return directCandidates.slice(0, 5);
+    }
+
+    async function searchAddress(options = {}) {
+      const raw = $('streetInput').value.trim();
+      if (!raw) {
+        setMessage('Сначала введи адрес, пересечение или выбери место из списка.', 'error');
+        $('streetInput').focus();
+        return;
+      }
+      currentAddress = raw;
+      $('presetSelect').value = '';
+      resetEstimate();
+      currentPoint = null;
+      updateStraightLineDistance();
+      if (addressMarker) { addressMarker.remove(); addressMarker = null; }
+      $('mapAddress').textContent = 'Ищу адрес…';
+      $('coordinates').textContent = 'Координаты адреса: —';
+      $('diagramPin').setAttribute('display', 'none');
+      if (leafletMap) leafletMap.setView(ALMATY_CENTER, 11);
+      $('candidateWrap').hidden = true;
+      setBusy(true);
+      setMessage('Ищу адрес и определяю координаты…');
+      const forcedRule = options.forcedRule || null;
+      const intersection = forcedRule ? null : parseIntersection(raw);
+      let complex = null;
+      try {
+        complex = (!forcedRule && !intersection) ? findResidentialComplex(raw) : null;
+        if (!forcedRule && !intersection && isResidentialComplexQuery(raw) && !complex && !hasExplicitHouseNumber(raw)) {
+          $('mapAddress').textContent = 'Точка не выбрана. Уточни название ЖК или введи точный адрес.';
+          setMessage('Не нашёл название объекта. Можно указать микрорайон или Орбиту с номером дома, например «Третий микрорайон, 35» или «Орбита 1, 54».', 'error');
+          return;
+        }
+        if (complex && complex.clarification) {
+          $('mapAddress').textContent = `${complex.title}: адрес требует уточнения.`;
+          $('coordinates').textContent = 'Координаты адреса: —';
+          $('resultStatus').hidden = false;
+          $('resultStatusText').textContent = 'Точка не поставлена до уточнения адреса';
+          setMessage(complex.clarification, 'error');
+          return;
+        }
+        const normalizedRaw = normalizeSpokenAddress(raw);
+        const hasAlmaty = /(?:алматы|almaty)/iu.test(normalizedRaw);
+        const query = hasAlmaty ? normalizedRaw : `${normalizedRaw}, Алматы, Казахстан`;
+        const results = complex
+          ? getResidentialCandidates(complex)
+          : intersection
+            ? await geocodeIntersection(intersection)
+            : await geocode(query);
+        if (!Array.isArray(results) || results.length === 0) {
+          throw new Error(intersection
+            ? `Названия улиц «${intersection.streetA}» и «${intersection.streetB}» распознаны, но карта не вернула точку их пересечения.`
+            : options.voice
+              ? 'Голос распознал фразу, но адрес не найден. Для адреса микрорайона или Орбиты назови номер района и номер дома, например «Третий микрорайон, тридцать пять».'
+              : `В Алматы не найден адрес «${normalizedRaw}». Попробуй указать микрорайон или Орбиту с номером дома; поиск работает только по Алматы и ближайшему пригороду.`);
+        }
+        if (complex && complex.requireChoice && results.length > 1) {
+          showResidentialCandidateChoices(results, complex, forcedRule);
+          return;
+        }
+        updateCandidates(results, forcedRule);
+        chooseCandidate(0, forcedRule);
+        const hasHouse = results[0].address && results[0].address.house_number;
+        const approximateIntersection = Boolean(intersection && results[0].approximate);
+        const coords = ` ${Number(results[0].lat).toFixed(5)}, ${Number(results[0].lon).toFixed(5)}`;
+        const resultMessage = complex
+          ? `${complex.title}: ${results[0].approximate ? 'точка комплекса ориентировочная — проверь метку и корпус.' : 'адрес найден по номерному адресу.'}${coords}`
+          : intersection
+            ? `${approximateIntersection ? 'Перекрёсток найден в справочнике; точка ориентировочная.' : 'Пересечение найдено по общему узлу дорог.'}${coords}`
+            : `${hasHouse ? 'Дом найден.' : 'Найден ближайший адресный объект; проверь точку на карте.'}${coords}`;
+        const messageKind = complex
+          ? results[0].approximate ? '' : 'success'
+          : approximateIntersection ? '' : intersection || hasHouse ? 'success' : '';
+        setMessage(resultMessage, messageKind);
+      } catch (error) {
+        $('candidateWrap').hidden = true;
+        if (forcedRule) {
+          const rule = forcedRule;
+          $('mapAddress').textContent = 'Точная точка не найдена; выбран только тариф района.';
+          setEstimate(rule.zone, `${ZONES[rule.zone].desc} Адрес по карте не найден — местоположение указано только на уровне выбранного района.`, 'approx');
+          currentPrice = rule.price;
+          $('resPrice').textContent = formatMoney(rule.price);
+          updateTrainingUI();
+          setMessage('Район и тариф определены по прайсу, но карту загрузить не удалось. Проверь интернет.', 'error');
+        } else if (complex) {
+          $('mapAddress').textContent = `${complex.title}: точная точка не найдена.`;
+          setMessage(complex.notFoundMessage || `Для ${complex.title} не удалось подтвердить точку корпуса. Введи полный адрес с улицей и номером дома; неверную метку программа не подставила.`, 'error');
+        } else {
+          $('mapAddress').textContent = 'Адрес не найден. Уточни запрос и попробуй снова.';
+          const guidance = intersection
+            ? 'Попробуй ввести ближайший номер дома или выбрать зону вручную. Если карта не отвечает, проверь соединение.'
+            : options.voice
+              ? 'Если это пересечение, добавь «и» между названиями улиц; если адрес дома — произнеси номер.'
+              : 'Поиск ограничен Алматы и ближайшим пригородом. Укажи улицу, микрорайон и номер дома; например: «Третий микрорайон, 39А, Алматы».';
+          setMessage(`${error.message || 'Не удалось найти адрес.'} ${guidance}`, 'error');
+        }
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function populateRateOptions(zoneKey) {
+      configureRangeInput(zoneKey);
+    }
+
+    function updateRangePrice() {
+      const zone = ZONES[currentZoneKey];
+      if (!isRangeZone(zone)) {
+        updateTrainingUI();
+        return;
+      }
+      const raw = $('rateSelect').value.trim();
+      const amount = Number(raw);
+      if (raw !== '' && Number.isInteger(amount) && amount >= zone.min && amount <= zone.max) {
+        currentPrice = amount;
+        currentRateMethod = 'range';
+        currentNote = `${zone.desc} Выбрано ${formatMoney(amount)}.`;
+        $('resPrice').textContent = formatMoney(amount);
+        $('resDesc').textContent = currentNote;
+        $('resultStatusText').textContent = 'Ставка выбрана в допустимом диапазоне';
+        $('saveBtn').disabled = !currentAddress;
+      } else {
+        currentPrice = null;
+        $('resPrice').textContent = zone.rangeLabel;
+        $('resDesc').textContent = raw ? `Допустимая сумма: ${zone.min}–${zone.max} ₸ целыми тенге.` : zone.desc;
+        $('resultStatusText').textContent = 'Укажи сумму внутри диапазона';
+        $('saveBtn').disabled = true;
+      }
+      updateTrainingUI();
+    }
+
+    function onZoneChange() {
+      const key = $('zoneSelect').value;
+      if (!key || !ZONES[key]) {
+        setUnclassified('Группа не выбрана. Выбери одну из зон по прайсу.');
+        return;
+      }
+      if ($('streetInput').value.trim()) currentAddress = $('streetInput').value.trim();
+      const zone = ZONES[key];
+      currentZoneKey = key;
+      currentZoneName = zone.zone;
+      currentNote = `${zone.desc} Зона выбрана вручную.`;
+      currentRateMethod = isRangeZone(zone) ? 'range' : 'fixed';
+      currentDistanceKm = null;
+      $('resultCard').classList.remove('empty');
+      $('resultAdjust').hidden = false;
+      $('resZone').textContent = zone.zone;
+      $('resDesc').textContent = currentNote;
+      $('resultCard').dataset.confidence = 'manual';
+      $('resultStatus').hidden = false;
+      $('rangeField').hidden = !isRangeZone(zone);
+      $('zone4Field').hidden = key !== 'zone4';
+      $('zone4DistanceWrap').hidden = true;
+      $('zone4Method').value = 'fixed';
+      $('zone4Distance').value = '';
+      if (isRangeZone(zone)) {
+        populateRateOptions(key);
+        currentPrice = null;
+        $('resPrice').textContent = zone.rangeLabel;
+        $('resultStatusText').textContent = 'Укажи точную ставку в диапазоне';
+        $('saveBtn').disabled = true;
+      } else {
+        $('rateSelect').value = '';
+        currentPrice = zone.price;
+        $('resPrice').textContent = formatMoney(zone.price);
+        $('resultStatusText').textContent = 'Стандартный тариф выбран автоматически';
+        $('saveBtn').disabled = !currentAddress;
+      }
+      updateTrainingUI();
+    }
+
+    function updateZone4Price() {
+      if (currentZoneKey !== 'zone4') {
+        updateTrainingUI();
+        return;
+      }
+      const alternative = $('zone4Method').value === 'distance';
+      $('zone4DistanceWrap').hidden = !alternative;
+      currentRateMethod = alternative ? 'distance' : 'fixed';
+      if (!alternative) {
+        currentDistanceKm = null;
+        currentPrice = ZONES.zone4.price;
+        currentNote = `${ZONES.zone4.desc} Выбран стандартный тариф 15 000 ₸.`;
+        $('resPrice').textContent = formatMoney(currentPrice);
+        $('resDesc').textContent = currentNote;
+        $('resultStatusText').textContent = 'Стандартный тариф Зоны 4';
+        $('saveBtn').disabled = !currentAddress;
+        updateTrainingUI();
+        return;
+      }
+      const raw = $('zone4Distance').value.trim();
+      const km = Number(raw.replace(',', '.'));
+      if (raw !== '' && Number.isFinite(km) && km >= 0 && Number.isSafeInteger(5000 + 250 * km)) {
+        currentDistanceKm = km;
+        currentPrice = 5000 + 250 * km;
+        currentNote = `Альтернативный тариф по прайсу: 5 000 ₸ + 250 ₸ × ${km} км от черты города. Расстояние введено вручную.`;
+        $('resPrice').textContent = formatMoney(currentPrice);
+        $('resDesc').textContent = currentNote;
+        $('resultStatusText').textContent = 'Альтернативный тариф · расстояние введено вручную';
+        $('saveBtn').disabled = !currentAddress;
+      } else {
+        currentDistanceKm = null;
+        currentPrice = null;
+        $('resPrice').textContent = 'Нужно расстояние';
+        $('resDesc').textContent = 'Введи подтверждённое расстояние от черты города. Программа не вычисляет его автоматически и не округляет дробные тенге.';
+        $('resultStatusText').textContent = 'Уточни расстояние от городской черты';
+        $('saveBtn').disabled = true;
+      }
+      updateTrainingUI();
+    }
+
+    function dayKey(date = new Date()) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function normalizeHistoryItem(item, index = 0) {
+      const source = item && typeof item === 'object' ? item : {};
+      const types = ['measurement', 'additionalVisit', 'windows', 'doors', 'ceilings', 'other'];
+      const outcomes = ['completed', 'falseCall'];
+      const payers = ['company', 'client', 'unknown'];
+      const legacyFalseCall = source.paymentStatus === 'falseCall' && !source.payer;
+      const outcome = outcomes.includes(source.outcome) ? source.outcome : (source.paymentStatus === 'falseCall' ? 'falseCall' : 'completed');
+      const payer = payers.includes(source.payer) ? source.payer : (legacyFalseCall || outcome === 'falseCall' ? 'unknown' : 'company');
+      const paymentStatus = ['paid', 'pending'].includes(source.paymentStatus) ? source.paymentStatus : (source.paymentStatus === 'falseCall' ? 'paid' : 'pending');
+      const originalZone = String(source.zone || 'Тариф не указан');
+      const zone = originalZone.toLowerCase().includes('зона 4') ? ZONES.zone4.zone : originalZone;
+      const numericPrice = Number(source.price);
+      const address = String(source.address || 'Выезд без названия');
+      const stableSeed = [source.savedAt || source.date || '', address, Number.isFinite(numericPrice) ? numericPrice : '', originalZone, String(source.comment || ''), index].join('|');
+      let hash = 2166136261;
+      for (let i = 0; i < stableSeed.length; i++) hash = Math.imul(hash ^ stableSeed.charCodeAt(i), 16777619);
+      const fallbackId = `legacy-${(hash >>> 0).toString(36)}`;
+      const needsReview = Boolean(source.needsReview) || legacyFalseCall || payer === 'unknown';
+      const distance = source.distanceKm !== null && source.distanceKm !== '' && Number.isFinite(Number(source.distanceKm)) ? Number(source.distanceKm) : null;
+      return {
+        id: source.id == null ? fallbackId : String(source.id),
+        address,
+        price: Number.isFinite(numericPrice) && numericPrice >= 0 ? Math.round(numericPrice) : 0,
+        zone,
+        savedAt: source.savedAt || null,
+        date: source.date || '',
+        outcome,
+        payer,
+        paymentStatus,
+        needsReview,
+        paidAt: source.paidAt || (paymentStatus === 'paid' ? source.savedAt || null : null),
+        measureType: types.includes(source.measureType) ? source.measureType : 'measurement',
+        comment: String(source.comment || ''),
+        rateMethod: source.rateMethod === 'distance' ? 'distance' : (source.rateMethod === 'range' ? 'range' : 'fixed'),
+        distanceKm: distance,
+        lat: source.lat !== null && source.lat !== '' && Number.isFinite(Number(source.lat)) ? Number(source.lat) : null,
+        lon: source.lon !== null && source.lon !== '' && Number.isFinite(Number(source.lon)) ? Number(source.lon) : null
+      };
+    }
+
+    function readHistory() {
+      const keys = [STORAGE_KEY, PREVIOUS_STORAGE_KEY, LEGACY_KEY];
+      const combined = [];
+      const ids = new Set();
+      let sawLegacySource = false;
+      for (const key of keys) {
+        const raw = store.get(key);
+        if (raw == null) continue;
+        let entries;
+        try {
+          const parsed = JSON.parse(raw);
+          entries = Array.isArray(parsed) ? parsed : (parsed && Array.isArray(parsed.history) ? parsed.history : null);
+        } catch (error) {
+          console.warn(`Не удалось прочитать ${key}:`, error);
+          continue;
+        }
+        if (!Array.isArray(entries)) continue;
+        if (key !== STORAGE_KEY) sawLegacySource = true;
+        entries.forEach((item, index) => {
+          const source = key === LEGACY_KEY && item && typeof item === 'object' && !item.paymentStatus
+            ? { ...item, paymentStatus: 'paid' }
+            : item;
+          const normalized = normalizeHistoryItem(source, index);
+          if (!ids.has(String(normalized.id))) {
+            ids.add(String(normalized.id));
+            combined.push(normalized);
+          }
+        });
+      }
+      combined.sort((a, b) => (entryDate(b) || 0) - (entryDate(a) || 0));
+      const currentRaw = store.get(STORAGE_KEY);
+      if (sawLegacySource || currentRaw == null || currentRaw !== JSON.stringify(combined)) {
+        store.set(STORAGE_KEY, JSON.stringify(combined));
+      }
+      return combined;
+    }
+
+    function isEarned(item) {
+      return item.payer === 'company' && item.paymentStatus === 'paid' && !item.needsReview;
+    }
+
+    function entryDate(item) {
+      const value = item.savedAt || item.date;
+      if (!value) return null;
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    function earningDate(item) {
+      const value = item.paidAt || (isEarned(item) ? item.savedAt || item.date : null);
+      if (!value) return null;
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    function emptySummarySnapshot() {
+      return { totalEarned: 0, pendingCompany: 0, pendingClient: 0, totalVisits: 0, falseCalls: 0, daily: {} };
+    }
+
+    function normalizeSummarySnapshot(value) {
+      const source = value && typeof value === 'object' ? value : {};
+      const toCount = number => Number.isFinite(Number(number)) ? Math.max(0, Math.round(Number(number))) : 0;
+      const daily = {};
+      if (source.daily && typeof source.daily === 'object') {
+        for (const [date, item] of Object.entries(source.daily)) {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !item || typeof item !== 'object') continue;
+          daily[date] = { earned: toCount(item.earned), paidCount: toCount(item.paidCount) };
+        }
+      }
+      return {
+        totalEarned: toCount(source.totalEarned),
+        pendingCompany: toCount(source.pendingCompany),
+        pendingClient: toCount(source.pendingClient),
+        totalVisits: toCount(source.totalVisits),
+        falseCalls: toCount(source.falseCalls),
+        daily
+      };
+    }
+
+    function readSummarySnapshot() {
+      try {
+        const raw = store.get(SUMMARY_KEY);
+        return raw == null ? emptySummarySnapshot() : normalizeSummarySnapshot(JSON.parse(raw));
+      } catch (error) {
+        console.warn('Не удалось прочитать сохранённую сводку:', error);
+        return emptySummarySnapshot();
+      }
+    }
+
+    function summarizeHistory(history) {
+      const summary = emptySummarySnapshot();
+      for (const item of history) {
+        const price = Number(item.price) || 0;
+        summary.totalVisits++;
+        if (item.outcome === 'falseCall') summary.falseCalls++;
+        if (isEarned(item)) {
+          summary.totalEarned += price;
+          const date = earningDate(item);
+          if (date) {
+            const key = dayKey(date);
+            if (!summary.daily[key]) summary.daily[key] = { earned: 0, paidCount: 0 };
+            summary.daily[key].earned += price;
+            summary.daily[key].paidCount++;
+          }
+        }
+        if (item.paymentStatus === 'pending' && item.payer === 'company' && !item.needsReview) summary.pendingCompany += price;
+        if (item.paymentStatus === 'pending' && item.payer === 'client' && !item.needsReview) summary.pendingClient += price;
+      }
+      return summary;
+    }
+
+    function combineSummarySnapshots(baseValue, additionalValue) {
+      const base = normalizeSummarySnapshot(baseValue);
+      const additional = normalizeSummarySnapshot(additionalValue);
+      base.totalEarned += additional.totalEarned;
+      base.pendingCompany += additional.pendingCompany;
+      base.pendingClient += additional.pendingClient;
+      base.totalVisits += additional.totalVisits;
+      base.falseCalls += additional.falseCalls;
+      for (const [date, item] of Object.entries(additional.daily)) {
+        if (!base.daily[date]) base.daily[date] = { earned: 0, paidCount: 0 };
+        base.daily[date].earned += item.earned;
+        base.daily[date].paidCount += item.paidCount;
+      }
+      return base;
+    }
+
+    function measurementLabel(type) {
+      return ({ measurement: 'Замер', additionalVisit: 'Доп. выезд', windows: 'Окна · старая запись', doors: 'Двери · старая запись', ceilings: 'Потолки · старая запись', other: 'Другое · старая запись' })[type] || 'Замер';
+    }
+
+    function paymentLabel(status) {
+      return status === 'paid' ? 'Оплачено' : 'Ожидает оплаты';
+    }
+
+    function payerLabel(payer) {
+      if (payer === 'company') return 'Компания FORONE.kz';
+      if (payer === 'client') return 'Клиент';
+      return 'Требует уточнения';
+    }
+
+    function outcomeLabel(outcome) {
+      return outcome === 'falseCall' ? 'Ложный вызов' : 'Замер состоялся';
+    }
+
+    function renderHistory() {
+      updateFileState();
+      const history = readHistory();
+      const list = $('historyList');
+      list.replaceChildren();
+      const totals = combineSummarySnapshots(readSummarySnapshot(), summarizeHistory(history));
+      const today = totals.daily[dayKey()] || { earned: 0, paidCount: 0 };
+      $('todayEarned').textContent = formatMoney(today.earned);
+      $('totalEarned').textContent = formatMoney(totals.totalEarned);
+      $('pendingTotal').textContent = formatMoney(totals.pendingCompany);
+      $('pendingClientTotal').textContent = formatMoney(totals.pendingClient);
+      $('todayCount').textContent = `${today.paidCount} оплаченных выездов от компании`;
+      $('totalVisits').textContent = String(totals.totalVisits);
+      $('falseCallCount').textContent = String(totals.falseCalls);
+      $('historyCount').textContent = `${history.length} ${plural(history.length, 'выезд', 'выезда', 'выездов')}`;
+      const reviewItems = history.filter(item => item.needsReview);
+      const notice = $('reviewNotice');
+      notice.hidden = reviewItems.length === 0;
+      notice.textContent = reviewItems.length
+        ? `Старых записей, требующих уточнения плательщика: ${reviewItems.length}. Выбери плательщика в соответствующей записи; до подтверждения эти суммы не включаются в начисления компании.`
+        : '';
+      if (!history.length) {
+        const empty = document.createElement('li');
+        empty.className = 'history-empty';
+        empty.textContent = 'Пока нет сохранённых выездов. Найди адрес и нажми «Сохранить выезд в историю». Оплату отмечай по факту получения денег.';
+        list.appendChild(empty);
+        return;
+      }
+
+      history.forEach(item => {
+        const li = document.createElement('li');
+        li.className = 'history-item';
+        const details = document.createElement('div');
+        const address = document.createElement('div');
+        address.className = 'history-address';
+        address.textContent = item.address || 'Выезд без названия';
+        const meta = document.createElement('div');
+        meta.className = 'history-meta';
+        const date = entryDate(item);
+        const dateText = date ? date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Дата неизвестна';
+        meta.textContent = `${dateText} · ${item.zone || 'Тариф не указан'} · ${measurementLabel(item.measureType)} · ${outcomeLabel(item.outcome)} · Плательщик: ${payerLabel(item.payer)}`;
+        const status = document.createElement('div');
+        status.className = `history-status ${item.paymentStatus === 'pending' ? 'pending' : 'paid'}${item.needsReview ? ' review' : ''}`;
+        status.textContent = item.needsReview ? 'Уточни плательщика · старый статус сохранён' : paymentLabel(item.paymentStatus);
+        details.append(address, meta, status);
+        const payerSelect = document.createElement('select');
+        payerSelect.className = 'select-input history-payer-select';
+        payerSelect.setAttribute('aria-label', `Изменить плательщика для ${item.address}`);
+        [['company', 'Плательщик: компания'], ['client', 'Плательщик: клиент'], ['unknown', 'Плательщик не уточнён']].forEach(([value, label]) => {
+          const option = document.createElement('option'); option.value = value; option.textContent = label; payerSelect.appendChild(option);
+        });
+        payerSelect.value = item.payer;
+        payerSelect.addEventListener('change', () => updateHistoryPayer(item.id, payerSelect.value));
+        details.appendChild(payerSelect);
+        const statusSelect = document.createElement('select');
+        statusSelect.className = 'select-input history-status-select';
+        statusSelect.setAttribute('aria-label', `Изменить факт оплаты для ${item.address}`);
+        [['pending', 'Ожидает оплаты'], ['paid', 'Оплачено']].forEach(([value, label]) => {
+          const option = document.createElement('option'); option.value = value; option.textContent = label; statusSelect.appendChild(option);
+        });
+        statusSelect.value = item.paymentStatus;
+        statusSelect.addEventListener('change', () => updateHistoryStatus(item.id, statusSelect.value));
+        details.appendChild(statusSelect);
+        if (item.comment) {
+          const comment = document.createElement('div');
+          comment.className = 'history-comment';
+          comment.textContent = item.comment;
+          details.appendChild(comment);
+        }
+        const amount = document.createElement('div');
+        amount.className = `history-amount${isEarned(item) ? '' : ' not-earned'}`;
+        amount.textContent = formatMoney(item.price);
+        li.append(details, amount);
+        list.appendChild(li);
+      });
+    }
+
+    function updateHistoryStatus(id, status) {
+      if (!['paid', 'pending'].includes(status)) return;
+      try {
+        const history = readHistory();
+        const item = history.find(entry => String(entry.id) === String(id));
+        if (!item) return;
+        item.paymentStatus = status;
+        item.paidAt = status === 'pending' ? null : new Date().toISOString();
+        store.set(STORAGE_KEY, JSON.stringify(history));
+        renderHistory();
+        setMessage('Факт оплаты обновлён. Начисления компании и ожидающие суммы пересчитаны.', 'success');
+      } catch (error) {
+        setMessage('Не удалось обновить статус оплаты в хранилище.', 'error');
+      }
+    }
+
+    function updateHistoryPayer(id, payer) {
+      if (!['company', 'client', 'unknown'].includes(payer)) return;
+      try {
+        const history = readHistory();
+        const item = history.find(entry => String(entry.id) === String(id));
+        if (!item) return;
+        item.payer = payer;
+        item.needsReview = payer === 'unknown';
+        store.set(STORAGE_KEY, JSON.stringify(history));
+        renderHistory();
+        setMessage(payer === 'unknown' ? 'Плательщик оставлен неуточнённым; сумма не включается в начисления компании.' : 'Плательщик подтверждён. Сводка пересчитана.', 'success');
+      } catch (error) {
+        setMessage('Не удалось обновить плательщика в хранилище.', 'error');
+      }
+    }
+
+    function plural(n, one, few, many) {
+      const abs = Math.abs(n) % 100;
+      const last = abs % 10;
+      if (abs > 10 && abs < 20) return many;
+      if (last > 1 && last < 5) return few;
+      if (last === 1) return one;
+      return many;
+    }
+
+    function saveEntry() {
+      if (!currentAddress || !currentZoneKey || !Number.isFinite(currentPrice) || currentPrice <= 0) {
+        setMessage('Сначала найди адрес или укажи актуальный адрес, выбери зону и введи точную ставку, если она требуется.', 'error');
+        return;
+      }
+      const outcome = $('visitOutcome').value;
+      const payer = $('payerSelect').value;
+      const paymentStatus = $('paymentStatus').value;
+      const measureType = $('measureType').value;
+      if (!['completed', 'falseCall'].includes(outcome) || !['company', 'client'].includes(payer) || !['pending', 'paid'].includes(paymentStatus) || !['measurement', 'additionalVisit'].includes(measureType)) {
+        setMessage('Проверь результат выезда, плательщика и факт получения оплаты.', 'error');
+        return;
+      }
+      const savedAt = new Date().toISOString();
+      const item = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        address: currentAddress,
+        price: Math.round(currentPrice),
+        zone: currentZoneName,
+        savedAt,
+        outcome,
+        payer,
+        paymentStatus,
+        needsReview: false,
+        paidAt: paymentStatus === 'pending' ? null : savedAt,
+        measureType,
+        comment: $('commentInput').value.trim(),
+        rateMethod: currentRateMethod,
+        distanceKm: currentRateMethod === 'distance' ? currentDistanceKm : null,
+        lat: currentPoint ? currentPoint[0] : null,
+        lon: currentPoint ? currentPoint[1] : null
+      };
+      const history = readHistory();
+      history.unshift(item);
+      try {
+        store.set(STORAGE_KEY, JSON.stringify(history.map(normalizeHistoryItem)));
+        rememberChoice();
+        renderHistory();
+        setMessage('Выезд сохранён. Начисления компании учитывают только подтверждённую оплату компанией. Нажми «СБОРКА», чтобы скачать копию с данными.', 'success');
+        resetForm();
+      } catch (error) {
+        setMessage('Не удалось сохранить запись. Проверь свободное место или настройки приватности.', 'error');
+      }
+    }
+
+    function resetForm() {
+      $('streetInput').value = '';
+      $('presetSelect').value = '';
+      $('zoneSelect').value = '';
+      $('paymentStatus').value = 'pending';
+      $('visitOutcome').value = 'completed';
+      $('payerSelect').value = 'company';
+      $('measureType').value = 'measurement';
+      $('commentInput').value = '';
+      $('rateSelect').value = '';
+      $('zone4Method').value = 'fixed';
+      $('zone4Distance').value = '';
+      currentAddress = '';
+      currentPoint = null;
+      currentZoneKey = null;
+      currentPrice = 0;
+      currentZoneName = '';
+      currentNote = '';
+      currentRateMethod = 'fixed';
+      currentDistanceKm = null;
+      geocodeCandidates = [];
+      $('candidateWrap').hidden = true;
+      if (addressMarker) { addressMarker.remove(); addressMarker = null; }
+      $('mapAddress').textContent = 'После поиска здесь появится адрес выезда.';
+      $('coordinates').textContent = 'Координаты адреса: —';
+      $('diagramPin').setAttribute('display', 'none');
+      $('diagramCaption').textContent = 'Схема помогает увидеть положение точки относительно города и базового квадрата.';
+      if (leafletMap) leafletMap.setView(ALMATY_CENTER, 11);
+      resetEstimate();
+      updateStraightLineDistance();
+      setMessage('Нажми «Найти адрес» — сервис поставит точку на карте.');
+    }
+
+    function selectPreset() {
+      const key = $('presetSelect').value;
+      if (!key || !ZONES[key]) return;
+      const typedAddress = $('streetInput').value.trim();
+      if (typedAddress && typedAddress !== currentAddress) {
+        currentAddress = typedAddress;
+        currentPoint = null;
+        updateStraightLineDistance();
+        if (addressMarker) { addressMarker.remove(); addressMarker = null; }
+        $('mapAddress').textContent = 'Адрес введён, но точка ещё не проверена на карте.';
+        $('coordinates').textContent = 'Координаты адреса: —';
+        $('diagramPin').setAttribute('display', 'none');
+      }
+      if (!currentAddress) {
+        $('presetSelect').value = '';
+        setMessage('Сначала введи адрес или найди его, затем выбери зону.', 'error');
+        $('streetInput').focus();
+        return;
+      }
+      $('zoneSelect').value = key;
+      onZoneChange();
+      setMessage('Зона выбрана вручную. Перед сохранением проверь адрес и цену.', 'success');
+    }
+
+    function exportHistory() {
+      const payload = { app: 'FORONE.kz address-price', version: 1, exportedAt: new Date().toISOString(), history: readHistory() };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `forone-history-${dayKey()}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      setMessage('История выгружена в JSON-файл.', 'success');
+    }
+
+    async function importHistory(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      try {
+        const parsed = JSON.parse(await file.text());
+        const source = Array.isArray(parsed) ? parsed : parsed && parsed.history;
+        if (!Array.isArray(source)) throw new Error('В файле нет списка выездов.');
+        if (source.length > 50000) throw new Error('В файле слишком много записей.');
+        const imported = source.map(normalizeHistoryItem);
+        if (imported.some(item => !item.address || item.price <= 0)) throw new Error('Есть запись без адреса или корректной цены.');
+        const current = readHistory();
+        const ids = new Set(current.map(item => String(item.id)));
+        const additions = [];
+        for (const item of imported) {
+          const id = String(item.id);
+          if (ids.has(id)) continue;
+          ids.add(id);
+          additions.push(item);
+        }
+        const merged = [...additions, ...current].sort((a, b) => (entryDate(b) || 0) - (entryDate(a) || 0));
+        store.set(STORAGE_KEY, JSON.stringify(merged));
+        renderHistory();
+        setMessage(`Импортировано записей: ${additions.length}. Повторяющиеся ID пропущены.`, 'success');
+      } catch (error) {
+        setMessage(`Не удалось импортировать JSON: ${error.message || 'проверь формат файла.'}`, 'error');
+      } finally {
+        event.target.value = '';
+      }
+    }
+
+    function printReport() { window.print(); }
+
+    function showGps() {
+      const button = $('gpsMapBtn');
+      if (!navigator.geolocation) {
+        setMessage('Браузер не поддерживает определение GPS-местоположения.', 'error');
+        return;
+      }
+      button.disabled = true;
+      gpsPoint = null;
+      gpsAccuracy = null;
+      if (gpsMarker) { gpsMarker.remove(); gpsMarker = null; }
+      updateStraightLineDistance();
+      setMessage('Запрашиваю разрешение и определяю текущее местоположение…');
+      navigator.geolocation.getCurrentPosition(position => {
+        const coords = position && position.coords;
+        const point = coords ? [Number(coords.latitude), Number(coords.longitude)] : null;
+        if (!isValidPoint(point)) {
+          button.disabled = false;
+          updateStraightLineDistance();
+          setMessage('Получены некорректные GPS-координаты. Попробуй определить местоположение ещё раз.', 'error');
+          return;
+        }
+        gpsPoint = point;
+        gpsAccuracy = coords.accuracy !== null && coords.accuracy !== undefined && Number.isFinite(Number(coords.accuracy)) && Number(coords.accuracy) >= 0 ? Number(coords.accuracy) : null;
+        if (leafletMap && window.L) {
+          gpsMarker = L.circleMarker(point, { radius: 8, color: '#fff', weight: 2, fillColor: '#2563eb', fillOpacity: 1 })
+            .addTo(leafletMap).bindPopup(`Моё GPS-местоположение${gpsAccuracy !== null ? `<br>Точность около ${Math.round(gpsAccuracy)} м` : ''}`);
+          if (addressMarker && typeof L.featureGroup === 'function') {
+            const bounds = L.featureGroup([addressMarker, gpsMarker]).getBounds();
+            if (bounds.isValid()) leafletMap.fitBounds(bounds.pad(0.15), { maxZoom: 15, animate: true });
+            else leafletMap.setView(point, 16, { animate: true });
+          } else {
+            leafletMap.setView(point, 16, { animate: true });
+          }
+        }
+        updateStraightLineDistance();
+        setMessage('GPS обновлён. Расстояние рассчитано по прямой; координаты GPS не сохраняются в истории.', 'success');
+        button.disabled = false;
+      }, error => {
+        const message = error.code === 1 ? 'Нет разрешения на геолокацию. Разреши доступ к местоположению в браузере.' : 'Не удалось получить GPS. Проверь разрешение и включи геолокацию телефона.';
+        updateStraightLineDistance();
+        setMessage(message, 'error');
+        button.disabled = false;
+      }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+    }
+
+    function toggleVoiceInput() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        setMessage('Голосовое распознавание недоступно в этом браузере. Используй микрофон на клавиатуре телефона (например, Gboard).', 'error');
+        return;
+      }
+      if (isRecording && recognition) { recognition.stop(); return; }
+      recognition = new SpeechRecognition();
+      recognition.lang = 'ru-RU';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.onstart = () => {
+        isRecording = true;
+        $('micBtn').classList.add('recording');
+        $('micBtn').setAttribute('aria-label', 'Остановить голосовой ввод');
+        setMessage('Слушаю адрес…');
+      };
+      recognition.onresult = event => {
+        const transcript = event.results && event.results[0] && event.results[0][0] ? event.results[0][0].transcript : '';
+        if (!transcript) { setMessage('Не удалось распознать адрес. Попробуй ещё раз или введи текстом.', 'error'); return; }
+        $('streetInput').value = transcript;
+        searchAddress({ voice: true });
+      };
+      recognition.onerror = event => {
+        const reason = event.error === 'not-allowed' ? 'Нет разрешения на микрофон.' : event.error === 'no-speech' ? 'Речь не распознана. Попробуй сказать ещё раз.' : 'Не удалось запустить распознавание речи.';
+        setMessage(reason, 'error');
+      };
+      recognition.onend = () => {
+        isRecording = false;
+        $('micBtn').classList.remove('recording');
+        $('micBtn').setAttribute('aria-label', 'Продиктовать адрес');
+      };
+      try { recognition.start(); }
+      catch (error) { setMessage('Не удалось включить микрофон. Проверь разрешение браузера.', 'error'); }
+    }
+
+    $('streetInput').addEventListener('input', () => {
+      const typed = $('streetInput').value.trim();
+      if (typed === currentAddress) return;
+      currentAddress = '';
+      currentPoint = null;
+      geocodeCandidates = [];
+      $('candidateWrap').hidden = true;
+      $('presetSelect').value = '';
+      if (addressMarker) { addressMarker.remove(); addressMarker = null; }
+      $('mapAddress').textContent = typed ? 'Адрес изменён — выполни поиск или выбери зону заново.' : 'После поиска здесь появится адрес выезда.';
+      $('coordinates').textContent = 'Координаты адреса: —';
+      updateStraightLineDistance();
+      $('diagramPin').setAttribute('display', 'none');
+      resetEstimate();
+      if (typed) setMessage('Адрес изменён. Старый расчёт сброшен; повтори поиск или выбери тариф вручную для нового адреса.');
+    });
+    $('searchBtn').addEventListener('click', () => searchAddress());
+    $('streetInput').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); searchAddress(); } });
+    $('micBtn').addEventListener('click', toggleVoiceInput);
+    $('gpsMapBtn').addEventListener('click', showGps);
+    $('presetSelect').addEventListener('change', selectPreset);
+    $('zoneSelect').addEventListener('change', onZoneChange);
+    $('rateSelect').addEventListener('input', updateRangePrice);
+    $('zone4Method').addEventListener('change', updateZone4Price);
+    $('zone4Distance').addEventListener('input', updateZone4Price);
+    $('rememberRateBtn').addEventListener('click', saveRememberedRate);
+    $('visitOutcome').addEventListener('change', () => {
+      $('payerSelect').value = $('visitOutcome').value === 'falseCall' ? 'client' : 'company';
+      $('paymentStatus').value = 'pending';
+    });
+    $('saveBtn').addEventListener('click', saveEntry);
+    $('resetBtn').addEventListener('click', resetForm);
+    $('saveFileBtn').addEventListener('click', saveFile);
+    $('exportBtn').addEventListener('click', exportHistory);
+    $('importBtn').addEventListener('click', () => $('importFile').click());
+    $('importFile').addEventListener('change', importHistory);
+    $('printBtn').addEventListener('click', printReport);
+    $('clearHistoryBtn').addEventListener('click', () => {
+      const history = readHistory();
+      if (!history.length) return;
+      if (window.confirm('Удалить только записи истории? Сводные показатели сохранятся. Чтобы сохранить изменения в HTML-копии, нажми «СБОРКА».')) {
+        const summary = combineSummarySnapshots(readSummarySnapshot(), summarizeHistory(history));
+        store.set(SUMMARY_KEY, JSON.stringify(summary));
+        [STORAGE_KEY, PREVIOUS_STORAGE_KEY, LEGACY_KEY].forEach(key => store.remove(key));
+        renderHistory();
+        setMessage('История очищена. Сводные показатели сохранены; нажми «СБОРКА», чтобы записать их в HTML-копию.', 'success');
+      }
+    });
+
+    window.addEventListener('load', () => {
+      bootData();
+      initMap();
+      renderHistory();
+    });
+  </script>
+</body>
+</html>
